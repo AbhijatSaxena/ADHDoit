@@ -23,8 +23,13 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await signIn(email, password)
-    } catch {
-      setError('Invalid email or password.')
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? ''
+      if (code === 'auth/operation-not-allowed') {
+        setError('Email/Password sign-in is not enabled yet. Enable it in the Firebase console.')
+      } else {
+        setError('Invalid email or password.')
+      }
       setLoading(false)
     }
   }

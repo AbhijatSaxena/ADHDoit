@@ -38,8 +38,10 @@ export default function SignUpPage() {
         setError('An account with this email already exists.')
       } else if (code === 'auth/invalid-email') {
         setError('Please enter a valid email address.')
+      } else if (code === 'auth/operation-not-allowed') {
+        setError('Email/Password sign-in is not enabled yet. The admin needs to enable it in the Firebase console.')
       } else {
-        setError('Could not create account. Please try again.')
+        setError(`Could not create account. (${code || 'unknown error'})`)
       }
       setLoading(false)
     }
