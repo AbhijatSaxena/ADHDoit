@@ -6,7 +6,7 @@ import {
 import { useAuthStore } from '../store/authStore'
 
 export default function LoginPage() {
-  const { signIn, user } = useAuthStore()
+  const { signIn, user, authLoading } = useAuthStore()
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
@@ -16,6 +16,11 @@ export default function LoginPage() {
   useEffect(() => {
     if (user) navigate('/todos', { replace: true })
   }, [user, navigate])
+
+  // Reset button spinner if auth resolves without navigating (Firestore error path)
+  useEffect(() => {
+    if (!authLoading && !user) setLoading(false)
+  }, [authLoading, user])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

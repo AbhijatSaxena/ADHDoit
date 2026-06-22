@@ -39,29 +39,36 @@ function cleanup() {
 export const useAuthStore = create<AuthState>((set) => {
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      // Ensure the user has a role doc (creates viewer if missing)
+      // fetchUserRole and createUserRole already have their own try/catch
       await createUserRole(user.uid)
       const role = await fetchUserRole(user.uid)
 
-      // Reuse existing session on refresh instead of creating a new one
-      let sessionId = sessionStorage.getItem(SESSION_KEY)
-      if (sessionId) {
-        await updateSessionLastSeen(sessionId).catch(() => { sessionId = null })
-      }
-      if (!sessionId) {
-        sessionId = await createSession(user.uid, user.email ?? '', navigator.userAgent)
-        sessionStorage.setItem(SESSION_KEY, sessionId)
-      }
-      _sessionId = sessionId
+      // Wrap all Firestore session operations so a DB outage never
+      // leaves the user stuck on an infinite loading screen.
+      let sessionId: string | null = null
+      try {
+        sessionId = sessionStorage.getItem(SESSION_KEY)
+        if (sessionId) {
+          await updateSessionLastSeen(sessionId).catch(() => { sessionId = null })
+        }
+        if (!sessionId) {
+          sessionId = await createSession(user.uid, user.email ?? '', navigator.userAgent)
+          sessionStorage.setItem(SESSION_KEY, sessionId)
+        }
+        _sessionId = sessionId
 
-      _stopWatchSession = watchSession(sessionId, () => {
-        cleanup()
-        firebaseSignOut(auth)
-      })
+        _stopWatchSession = watchSession(sessionId, () => {
+          cleanup()
+          firebaseSignOut(auth)
+        })
 
-      _lastSeenInterval = setInterval(() => {
-        if (_sessionId) updateSessionLastSeen(_sessionId).catch(() => {})
-      }, 5 * 60 * 1000)
+        _lastSeenInterval = setInterval(() => {
+          if (_sessionId) updateSessionLastSeen(_sessionId).catch(() => {})
+        }, 5 * 60 * 1000)
+      } catch {
+        // Firestore unavailable — still let the user in (read-only at minimum)
+        sessionId = null
+      }
 
       set({ user, role, authLoading: false, sessionId })
     } else {

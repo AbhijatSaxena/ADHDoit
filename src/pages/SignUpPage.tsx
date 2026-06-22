@@ -6,7 +6,7 @@ import {
 import { useAuthStore } from '../store/authStore'
 
 export default function SignUpPage() {
-  const { signUp, user } = useAuthStore()
+  const { signUp, user, authLoading } = useAuthStore()
   const [email, setEmail]           = useState('')
   const [password, setPassword]     = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
@@ -17,6 +17,11 @@ export default function SignUpPage() {
   useEffect(() => {
     if (user) navigate('/todos', { replace: true })
   }, [user, navigate])
+
+  // Reset button spinner if auth resolves without navigating (Firestore error path)
+  useEffect(() => {
+    if (!authLoading && !user) setLoading(false)
+  }, [authLoading, user])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
