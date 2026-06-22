@@ -44,15 +44,28 @@ export async function fetchUserRole(uid: string): Promise<'admin' | 'viewer'> {
   }
 }
 
-export async function createUserRole(uid: string): Promise<void> {
+export async function createUserRole(uid: string, email?: string): Promise<void> {
   try {
     const snap = await getDoc(doc(db, 'users', uid))
     if (!snap.exists()) {
-      await setDoc(doc(db, 'users', uid), { role: 'viewer' })
+      await setDoc(doc(db, 'users', uid), { role: 'viewer', email: email ?? '' })
+    } else if (email && !snap.data().email) {
+      await updateDoc(doc(db, 'users', uid), { email })
     }
   } catch {
     // ignore — might fail if user doc already exists or rules deny it
   }
+}
+
+export interface UserRecord {
+  uid: string
+  email: string
+  role: 'admin' | 'viewer'
+}
+
+export async function fetchAllUsers(): Promise<UserRecord[]> {
+  const snap = await getDocs(collection(db, 'users'))
+  return snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserRecord))
 }
 
 // ─── Todos ────────────────────────────────────────────────────────────────────

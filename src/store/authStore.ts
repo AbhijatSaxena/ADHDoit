@@ -40,7 +40,7 @@ export const useAuthStore = create<AuthState>((set) => {
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       // fetchUserRole and createUserRole already have their own try/catch
-      await createUserRole(user.uid)
+      await createUserRole(user.uid, user.email ?? '')
       const role = await fetchUserRole(user.uid)
 
       // Wrap all Firestore session operations so a DB outage never
