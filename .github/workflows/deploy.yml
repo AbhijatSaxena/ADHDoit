@@ -25,10 +25,10 @@ jobs:
         env:
           VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
 
-      - name: Deploy to Firebase
+      - name: Deploy to Firebase Hosting
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
           GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json npx firebase-tools deploy \
             --project adhdoitapp \
-            --only hosting,firestore \
+            --only hosting \
             --non-interactive
