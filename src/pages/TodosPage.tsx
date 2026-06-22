@@ -15,7 +15,6 @@ import type { TodoAction } from '../services/ai'
 import TodoGraph from '../components/TodoGraph'
 import TodoDetailPanel from '../components/TodoDetailPanel'
 import TodoAiChat from '../components/TodoAiChat'
-import { useIsReadOnly } from '../store/authStore'
 import { useTodoFocus } from '../hooks/useTodoFocus'
 
 export default function TodosPage() {
@@ -25,7 +24,6 @@ export default function TodosPage() {
   const [showCompleted, setShowCompleted] = useState(false)
   const [newText, setNewText] = useState('')
   const [adding, setAdding] = useState(false)
-  const isReadOnly = useIsReadOnly()
   const { focusedId, paused, accMs, focus, pause, resume, unfocus } = useTodoFocus()
 
   async function handleStop() {
@@ -121,30 +119,28 @@ export default function TodosPage() {
         />
       )}
 
-      {!isReadOnly && (
-        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="New todo… (press Enter)"
-            value={newText}
-            onChange={e => setNewText(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAddTodo()}
-            disabled={adding}
-            slotProps={{
-              input: {
-                endAdornment: newText.trim() ? (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={handleAddTodo} disabled={adding} edge="end">
-                      {adding ? <CircularProgress size={16} /> : <AddIcon sx={{ fontSize: 18 }} />}
-                    </IconButton>
-                  </InputAdornment>
-                ) : undefined,
-              },
-            }}
-          />
-        </Box>
-      )}
+      <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+        <TextField
+          size="small"
+          fullWidth
+          placeholder="New todo… (press Enter)"
+          value={newText}
+          onChange={e => setNewText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleAddTodo()}
+          disabled={adding}
+          slotProps={{
+            input: {
+              endAdornment: newText.trim() ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={handleAddTodo} disabled={adding} edge="end">
+                    {adding ? <CircularProgress size={16} /> : <AddIcon sx={{ fontSize: 18 }} />}
+                  </IconButton>
+                </InputAdornment>
+              ) : undefined,
+            },
+          }}
+        />
+      </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1.5 }}>
         <Button
@@ -186,25 +182,23 @@ export default function TodosPage() {
                 key={t.id}
                 divider
                 secondaryAction={
-                  !isReadOnly && (
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="Mark as not done">
-                        <IconButton size="small" onClick={() => update({ ...t, done: false })} sx={{ color: 'text.secondary', '&:hover': { color: 'success.main' } }}>
-                          <CheckCircleOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Archive">
-                        <IconButton size="small" onClick={() => archive(t.id)} sx={{ color: 'text.secondary', '&:hover': { color: 'warning.main' } }}>
-                          <InventoryOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete permanently">
-                        <IconButton size="small" onClick={() => remove(t.id)} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
-                          <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  )
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <Tooltip title="Mark as not done">
+                      <IconButton size="small" onClick={() => update({ ...t, done: false })} sx={{ color: 'text.secondary', '&:hover': { color: 'success.main' } }}>
+                        <CheckCircleOutlinedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Archive">
+                      <IconButton size="small" onClick={() => archive(t.id)} sx={{ color: 'text.secondary', '&:hover': { color: 'warning.main' } }}>
+                        <InventoryOutlinedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete permanently">
+                      <IconButton size="small" onClick={() => remove(t.id)} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
+                        <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 }
               >
                 <ListItemText
@@ -237,20 +231,18 @@ export default function TodosPage() {
                 key={t.id}
                 divider
                 secondaryAction={
-                  !isReadOnly && (
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="Unarchive">
-                        <IconButton size="small" onClick={() => unarchive(t.id)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
-                          <UnarchiveOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete permanently">
-                        <IconButton size="small" onClick={() => remove(t.id)} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
-                          <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  )
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <Tooltip title="Unarchive">
+                      <IconButton size="small" onClick={() => unarchive(t.id)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+                        <UnarchiveOutlinedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete permanently">
+                      <IconButton size="small" onClick={() => remove(t.id)} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}>
+                        <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 }
               >
                 <ListItemText
@@ -268,7 +260,7 @@ export default function TodosPage() {
         </DialogContent>
       </Dialog>
 
-      {!isReadOnly && <TodoAiChat todos={todos} onExecute={executeAiActions} />}
+      <TodoAiChat todos={todos} onExecute={executeAiActions} />
     </Box>
   )
 }

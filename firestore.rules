@@ -9,9 +9,16 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isAuth() && request.auth.uid == uid;
-      // Allow users to create their own doc with viewer role on sign-up
       allow create: if isAuth() && request.auth.uid == uid && request.resource.data.role == 'viewer';
       allow update, delete: if isAdmin();
+
+      match /todos/{todoId} {
+        allow read, write: if isAuth() && request.auth.uid == uid;
+
+        match /comments/{commentId} {
+          allow read, write: if isAuth() && request.auth.uid == uid;
+        }
+      }
     }
 
     match /sessions/{sessionId} {
@@ -22,11 +29,6 @@ service cloud.firestore {
 
     match /focusState/{uid} {
       allow read, write: if isAuth() && request.auth.uid == uid;
-    }
-
-    match /{document=**} {
-      allow read:  if isAuth();
-      allow write: if isAdmin();
     }
   }
 }

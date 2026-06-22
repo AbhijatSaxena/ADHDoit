@@ -16,7 +16,6 @@ import { isTodoBlocked } from '../utils/todoUtils'
 import { fmtMs } from '../lib/fmt'
 import { useCommentStore } from '../store/commentStore'
 import { useTodoStore } from '../store/todoStore'
-import { useIsReadOnly } from '../store/authStore'
 import { confirm } from './ConfirmDialog'
 
 interface Props {
@@ -54,7 +53,6 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
   const [titleDraft, setTitleDraft] = useState('')
   const { comments, loading: commentsLoading, load, add: addComment, remove: removeComment } = useCommentStore()
   const { add: addTodo, update: updateTodo, archive: archiveTodo, remove: removeTodo } = useTodoStore()
-  const isReadOnly = useIsReadOnly()
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { load(todo.id) }, [todo.id])
@@ -63,7 +61,6 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
   }, [comments.length])
 
   function startTitleEdit() {
-    if (isReadOnly) return
     setTitleDraft(todo.text)
     setEditingTitle(true)
   }
@@ -166,7 +163,7 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
                 </Typography>
               )}
             </Box>
-            {!isReadOnly && editingTitle ? (
+            {editingTitle ? (
               <TextField
                 size="small"
                 fullWidth
@@ -188,9 +185,9 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
                   textDecoration: todo.done ? 'line-through' : 'none',
                   lineHeight: 1.4,
                   wordBreak: 'break-word',
-                  cursor: isReadOnly ? 'default' : 'text',
+                  cursor: 'text',
                   borderRadius: 1,
-                  '&:hover': isReadOnly ? {} : { bgcolor: 'action.hover', px: 0.5, mx: -0.5 },
+                  '&:hover': { bgcolor: 'action.hover', px: 0.5, mx: -0.5 },
                 }}
               >
                 {todo.text}
@@ -202,40 +199,38 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
           </IconButton>
         </Box>
 
-        {!isReadOnly && (
-          <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
-            <Button
-              size="small"
-              variant={todo.done ? 'outlined' : 'contained'}
-              color={todo.done ? 'inherit' : 'success'}
-              startIcon={<CheckCircleOutlinedIcon sx={{ fontSize: 14 }} />}
-              onClick={handleToggleDone}
-              sx={{ fontSize: 11, py: 0.5, textTransform: 'none', flex: 1 }}
-            >
-              {todo.done ? 'Unmark done' : 'Mark as done'}
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              color="warning"
-              startIcon={<InventoryOutlinedIcon sx={{ fontSize: 14 }} />}
-              onClick={handleArchive}
-              sx={{ fontSize: 11, py: 0.5, textTransform: 'none', flex: 1 }}
-            >
-              Archive
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteOutlineIcon sx={{ fontSize: 14 }} />}
-              onClick={handleDelete}
-              sx={{ fontSize: 11, py: 0.5, textTransform: 'none', flex: 1 }}
-            >
-              Delete
-            </Button>
-          </Box>
-        )}
+        <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+          <Button
+            size="small"
+            variant={todo.done ? 'outlined' : 'contained'}
+            color={todo.done ? 'inherit' : 'success'}
+            startIcon={<CheckCircleOutlinedIcon sx={{ fontSize: 14 }} />}
+            onClick={handleToggleDone}
+            sx={{ fontSize: 11, py: 0.5, textTransform: 'none', flex: 1 }}
+          >
+            {todo.done ? 'Unmark done' : 'Mark as done'}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="warning"
+            startIcon={<InventoryOutlinedIcon sx={{ fontSize: 14 }} />}
+            onClick={handleArchive}
+            sx={{ fontSize: 11, py: 0.5, textTransform: 'none', flex: 1 }}
+          >
+            Archive
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteOutlineIcon sx={{ fontSize: 14 }} />}
+            onClick={handleDelete}
+            sx={{ fontSize: 11, py: 0.5, textTransform: 'none', flex: 1 }}
+          >
+            Delete
+          </Button>
+        </Box>
 
         {canFocus && !isFocused && (
           <Button
@@ -311,11 +306,9 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
                       <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
                         {new Date(c.createdAt).toLocaleString('en-IN', { hour12: true, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </Typography>
-                      {!isReadOnly && (
-                        <IconButton size="small" onClick={() => removeComment(c.id)} sx={{ color: 'text.disabled', p: 0.25, '&:hover': { color: 'error.main' } }}>
-                          <DeleteOutlineIcon sx={{ fontSize: 12 }} />
-                        </IconButton>
-                      )}
+                      <IconButton size="small" onClick={() => removeComment(c.id)} sx={{ color: 'text.disabled', p: 0.25, '&:hover': { color: 'error.main' } }}>
+                        <DeleteOutlineIcon sx={{ fontSize: 12 }} />
+                      </IconButton>
                     </Box>
                   </Box>
                   <Typography variant="body2" sx={{ fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
@@ -339,11 +332,9 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
                 {activeDeps.map(dep => (
                   <Box key={dep.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.75, borderBottom: '1px solid #1f2937' }}>
                     <Typography variant="body2" sx={{ flex: 1, fontSize: 12, color: 'error.light' }}>🔒 {dep.text}</Typography>
-                    {!isReadOnly && (
-                      <IconButton size="small" onClick={() => toggleDep(dep.id)} sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: 'error.main' } }}>
-                        <CloseIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
-                    )}
+                    <IconButton size="small" onClick={() => toggleDep(dep.id)} sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: 'error.main' } }}>
+                      <CloseIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
                   </Box>
                 ))}
               </Box>
@@ -362,7 +353,7 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
               </Box>
             )}
 
-            {linkableTodos.length > 0 && !isReadOnly && (
+            {linkableTodos.length > 0 && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.75, display: 'block' }}>
                   Link existing todo
@@ -376,27 +367,25 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
               </Box>
             )}
 
-            {!isReadOnly && (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.75, display: 'block' }}>
-                  Create new blocker
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <TextField
-                    size="small"
-                    fullWidth
-                    placeholder="New blocking todo…"
-                    value={newBlockerText}
-                    onChange={e => setNewBlockerText(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAddBlocker()}
-                    sx={{ '& .MuiInputBase-root': { fontSize: 12 } }}
-                  />
-                  <IconButton size="small" onClick={handleAddBlocker} disabled={!newBlockerText.trim()} color="primary">
-                    <AddIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Box>
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.75, display: 'block' }}>
+                Create new blocker
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="New blocking todo…"
+                  value={newBlockerText}
+                  onChange={e => setNewBlockerText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddBlocker()}
+                  sx={{ '& .MuiInputBase-root': { fontSize: 12 } }}
+                />
+                <IconButton size="small" onClick={handleAddBlocker} disabled={!newBlockerText.trim()} color="primary">
+                  <AddIcon sx={{ fontSize: 18 }} />
+                </IconButton>
               </Box>
-            )}
+            </Box>
 
             {(todo.dependsOn ?? []).length === 0 && linkableTodos.length === 0 && (
               <Typography variant="body2" color="text.disabled" sx={{ textAlign: 'center', py: 3, fontSize: 12 }}>
@@ -408,7 +397,7 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
       </Box>
 
       {/* Comment input */}
-      {tab === 0 && !isReadOnly && (
+      {tab === 0 && (
         <Box sx={{ p: 2, borderTop: '1px solid #1f2937' }}>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <TextField

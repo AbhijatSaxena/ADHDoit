@@ -57,49 +57,53 @@ export async function createUserRole(uid: string): Promise<void> {
 
 // ─── Todos ────────────────────────────────────────────────────────────────────
 
-export async function fetchTodos() {
-  const snap = await getDocs(query(collection(db, 'todos'), orderBy('order')))
+function todosCol(uid: string) {
+  return collection(db, 'users', uid, 'todos')
+}
+
+export async function fetchTodos(uid: string) {
+  const snap = await getDocs(query(todosCol(uid), orderBy('order')))
   return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((t: Record<string, unknown>) => !t.archived)
 }
 
-export async function fetchArchivedTodos() {
-  const snap = await getDocs(query(collection(db, 'todos'), orderBy('order')))
+export async function fetchArchivedTodos(uid: string) {
+  const snap = await getDocs(query(todosCol(uid), orderBy('order')))
   return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((t: Record<string, unknown>) => t.archived === true)
 }
 
-export async function saveTodo(todo: Record<string, unknown>) {
+export async function saveTodo(uid: string, todo: Record<string, unknown>) {
   const { id, ...data } = todo
-  await setDoc(doc(db, 'todos', id as string), data)
+  await setDoc(doc(db, 'users', uid, 'todos', id as string), data)
 }
 
-export async function deleteTodo(id: string) {
-  await deleteDoc(doc(db, 'todos', id))
+export async function deleteTodo(uid: string, id: string) {
+  await deleteDoc(doc(db, 'users', uid, 'todos', id))
 }
 
 // ─── Todo Comments ────────────────────────────────────────────────────────────
 
-export async function fetchComments(todoId: string) {
+export async function fetchComments(uid: string, todoId: string) {
   const snap = await getDocs(
-    query(collection(db, 'todos', todoId, 'comments'), orderBy('createdAt'))
+    query(collection(db, 'users', uid, 'todos', todoId, 'comments'), orderBy('createdAt'))
   )
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
-export async function addComment(todoId: string, comment: { text: string; authorName: string; createdAt: number }) {
-  const ref = await addDoc(collection(db, 'todos', todoId, 'comments'), comment)
+export async function addComment(uid: string, todoId: string, comment: { text: string; authorName: string; createdAt: number }) {
+  const ref = await addDoc(collection(db, 'users', uid, 'todos', todoId, 'comments'), comment)
   return ref.id
 }
 
-export async function deleteComment(todoId: string, commentId: string) {
-  await deleteDoc(doc(db, 'todos', todoId, 'comments', commentId))
+export async function deleteComment(uid: string, todoId: string, commentId: string) {
+  await deleteDoc(doc(db, 'users', uid, 'todos', todoId, 'comments', commentId))
 }
 
-export async function bumpCommentCount(todoId: string, delta: 1 | -1) {
-  await updateDoc(doc(db, 'todos', todoId), { commentCount: increment(delta) })
+export async function bumpCommentCount(uid: string, todoId: string, delta: 1 | -1) {
+  await updateDoc(doc(db, 'users', uid, 'todos', todoId), { commentCount: increment(delta) })
 }
 
-export async function setCommentCount(todoId: string, count: number) {
-  await updateDoc(doc(db, 'todos', todoId), { commentCount: count })
+export async function setCommentCount(uid: string, todoId: string, count: number) {
+  await updateDoc(doc(db, 'users', uid, 'todos', todoId), { commentCount: count })
 }
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────

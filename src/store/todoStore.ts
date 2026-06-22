@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Todo } from '../types'
-import { fetchTodos, fetchArchivedTodos, saveTodo, deleteTodo } from '../services/firebase'
+import { fetchTodos, fetchArchivedTodos, saveTodo, deleteTodo, auth } from '../services/firebase'
 
 interface TodoState {
   todos: Todo[]
@@ -22,6 +22,12 @@ function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
+function uid() {
+  const u = auth.currentUser
+  if (!u) throw new Error('Not authenticated')
+  return u.uid
+}
+
 export const useTodoStore = create<TodoState>((set, get) => ({
   todos: [],
   archivedTodos: [],
@@ -30,13 +36,13 @@ export const useTodoStore = create<TodoState>((set, get) => ({
 
   load: async () => {
     set({ loading: true })
-    const todos = await fetchTodos() as Todo[]
+    const todos = await fetchTodos(uid()) as Todo[]
     set({ todos, loading: false })
   },
 
   loadArchived: async () => {
     set({ loadingArchived: true })
-    const archivedTodos = await fetchArchivedTodos() as Todo[]
+    const archivedTodos = await fetchArchivedTodos(uid()) as Todo[]
     set({ archivedTodos, loadingArchived: false })
   },
 
@@ -44,18 +50,18 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     const todos = get().todos
     const order = todos.length > 0 ? Math.max(...todos.map(t => t.order)) + 1 : 0
     const todo: Todo = { id: newId(), text, order, done: false }
-    await saveTodo(todo as unknown as Record<string, unknown>)
+    await saveTodo(uid(), todo as unknown as Record<string, unknown>)
     set(state => ({ todos: [...state.todos, todo] }))
     return todo
   },
 
   update: async (todo: Todo) => {
-    await saveTodo(todo as unknown as Record<string, unknown>)
+    await saveTodo(uid(), todo as unknown as Record<string, unknown>)
     set(state => ({ todos: state.todos.map(t => t.id === todo.id ? todo : t) }))
   },
 
   remove: async (id: string) => {
-    await deleteTodo(id)
+    await deleteTodo(uid(), id)
     set(state => ({
       todos: state.todos.filter(t => t.id !== id),
       archivedTodos: state.archivedTodos.filter(t => t.id !== id),
@@ -66,7 +72,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     const todo = get().todos.find(t => t.id === id)
     if (!todo) return
     const archived = { ...todo, archived: true }
-    await saveTodo(archived as unknown as Record<string, unknown>)
+    await saveTodo(uid(), archived as unknown as Record<string, unknown>)
     set(state => ({ todos: state.todos.filter(t => t.id !== id) }))
   },
 
@@ -74,7 +80,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     const todo = get().archivedTodos.find(t => t.id === id)
     if (!todo) return
     const active = { ...todo, archived: false }
-    await saveTodo(active as unknown as Record<string, unknown>)
+    await saveTodo(uid(), active as unknown as Record<string, unknown>)
     set(state => ({
       archivedTodos: state.archivedTodos.filter(t => t.id !== id),
       todos: [...state.todos, active],

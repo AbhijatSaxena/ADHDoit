@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Typography, Chip, Tooltip, BottomNavigation, BottomNavigationAction, Paper,
+  Typography, Tooltip, BottomNavigation, BottomNavigationAction, Paper,
 } from '@mui/material'
 import { useAuthStore } from '../store/authStore'
 
@@ -83,9 +83,6 @@ export default function Layout() {
               {user?.email}
             </Typography>
           </Tooltip>
-          {role === 'viewer' && (
-            <Chip label="View only" size="small" color="warning" variant="outlined" sx={{ mt: 0.5, height: 18, fontSize: 10 }} />
-          )}
           <Box
             component="button"
             onClick={() => signOut()}
@@ -115,10 +112,7 @@ export default function Layout() {
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            {role === 'viewer' && (
-              <Chip label="View only" size="small" color="warning" variant="outlined" sx={{ height: 18, fontSize: 10 }} />
-            )}
-            <Box
+              <Box
               component="button"
               onClick={() => signOut()}
               sx={{ color: 'text.disabled', cursor: 'pointer', background: 'none', border: 'none', p: 0, fontSize: 11, '&:hover': { color: 'text.secondary' } }}
