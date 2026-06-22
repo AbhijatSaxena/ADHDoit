@@ -18,14 +18,13 @@ import {
 } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth'
 
-// Firebase web config is public by design — security comes from Firestore rules
 const firebaseConfig = {
-  apiKey:            'VITE_FIREBASE_API_KEY_PLACEHOLDER',
-  authDomain:        'VITE_FIREBASE_AUTH_DOMAIN_PLACEHOLDER',
-  projectId:         'adhdoitapp',
-  storageBucket:     'VITE_FIREBASE_STORAGE_BUCKET_PLACEHOLDER',
-  messagingSenderId: 'VITE_FIREBASE_SENDER_ID_PLACEHOLDER',
-  appId:             '1:VITE_FIREBASE_SENDER_ID_PLACEHOLDER:web:82bf6a0b399730331158bc',
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
 const app  = initializeApp(firebaseConfig)
