@@ -156,6 +156,7 @@ interface UserTodosRowProps {
 }
 
 function UserTodosRow({ user, onDeleted }: UserTodosRowProps) {
+  const currentUid = useAuthStore(s => s.user?.uid)
   const [expanded, setExpanded] = useState(false)
   const [todos, setTodos] = useState<Todo[]>([])
   const [archived, setArchived] = useState<Todo[]>([])
@@ -261,16 +262,18 @@ function UserTodosRow({ user, onDeleted }: UserTodosRowProps) {
             </Typography>
           )}
           {loading && <CircularProgress size={12} sx={{ ml: 'auto', mr: 1 }} />}
-          <Button
-            size="small"
-            color="error"
-            variant="outlined"
-            onClick={handleDeleteAccount}
-            disabled={deleting}
-            sx={{ ml: expanded || loading ? 0 : 'auto', mr: 1, fontSize: 11, py: 0.25, px: 1, minWidth: 0, height: 24, borderColor: 'error.dark', '&:hover': { borderColor: 'error.main', bgcolor: 'rgba(239,68,68,0.08)' } }}
-          >
-            {deleting ? <CircularProgress size={12} color="error" /> : 'Delete'}
-          </Button>
+          {currentUid !== user.uid && (
+            <Button
+              size="small"
+              color="error"
+              variant="outlined"
+              onClick={handleDeleteAccount}
+              disabled={deleting}
+              sx={{ ml: expanded || loading ? 0 : 'auto', mr: 1, fontSize: 11, py: 0.25, px: 1, minWidth: 0, height: 24, borderColor: 'error.dark', '&:hover': { borderColor: 'error.main', bgcolor: 'rgba(239,68,68,0.08)' } }}
+            >
+              {deleting ? <CircularProgress size={12} color="error" /> : 'Delete'}
+            </Button>
+          )}
         </Box>
       </AccordionSummary>
 
