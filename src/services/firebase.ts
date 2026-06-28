@@ -12,6 +12,7 @@ import {
   increment,
   query,
   orderBy,
+  where,
   onSnapshot,
   enableIndexedDbPersistence,
   Timestamp,
@@ -186,4 +187,23 @@ export function watchFocusState(uid: string, onChange: (state: FocusStateDoc | n
   return onSnapshot(doc(db, 'focusState', uid), snap => {
     onChange(snap.exists() ? (snap.data() as FocusStateDoc) : null)
   })
+}
+
+// ─── Delete user account ──────────────────────────────────────────────────────
+
+export async function deleteUserAccount(uid: string): Promise<void> {
+  // 1. Delete all comments under all todos
+  const todosSnap = await getDocs(collection(db, 'users', uid, 'todos'))
+  for (const todoDoc of todosSnap.docs) {
+    const commentsSnap = await getDocs(collection(db, 'users', uid, 'todos', todoDoc.id, 'comments'))
+    for (const commentDoc of commentsSnap.docs) await deleteDoc(commentDoc.ref)
+    await deleteDoc(todoDoc.ref)
+  }
+  // 2. Delete focus state
+  await deleteDoc(doc(db, 'focusState', uid)).catch(() => {})
+  // 3. Delete all sessions for this user
+  const sessionsSnap = await getDocs(query(collection(db, 'sessions'), where('userId', '==', uid)))
+  for (const sessionDoc of sessionsSnap.docs) await deleteDoc(sessionDoc.ref)
+  // 4. Delete user doc
+  await deleteDoc(doc(db, 'users', uid))
 }

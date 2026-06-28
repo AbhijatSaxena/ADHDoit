@@ -3,7 +3,7 @@ import {
   Box, Typography, Table, TableBody, TableCell, TableHead, TableRow,
   IconButton, Tooltip, Chip, CircularProgress, Paper, Tabs, Tab,
   Accordion, AccordionSummary, AccordionDetails, List, ListItem,
-  ListItemText,
+  ListItemText, Button,
 } from '@mui/material'
 import LogoutIcon from '@mui/icons-material/Logout'
 import RefreshIcon from '@mui/icons-material/Refresh'
@@ -14,7 +14,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined'
 import {
   fetchAllSessions, revokeSession, fetchAllUsers, fetchTodos, fetchArchivedTodos,
-  saveTodo, deleteTodo,
+  saveTodo, deleteTodo, deleteUserAccount,
 } from '../services/firebase'
 import type { Session, UserRecord } from '../services/firebase'
 import type { Todo } from '../types'
@@ -152,13 +152,15 @@ function SessionsTab() {
 
 interface UserTodosRowProps {
   user: UserRecord
+  onDeleted: (uid: string) => void
 }
 
-function UserTodosRow({ user }: UserTodosRowProps) {
+function UserTodosRow({ user, onDeleted }: UserTodosRowProps) {
   const [expanded, setExpanded] = useState(false)
   const [todos, setTodos] = useState<Todo[]>([])
   const [archived, setArchived] = useState<Todo[]>([])
   const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
 
   async function load() {
@@ -208,6 +210,24 @@ function UserTodosRow({ user }: UserTodosRowProps) {
     else setTodos(prev => prev.filter(t => t.id !== todo.id))
   }
 
+  async function handleDeleteAccount(e: React.MouseEvent) {
+    e.stopPropagation()
+    const ok = await confirm({
+      title: 'Delete account',
+      message: `Delete ${user.email || user.uid}? This will permanently remove all their todos, sessions and account data. The Firebase Auth login will also be removed.`,
+      confirmLabel: 'Delete account',
+      danger: true,
+    })
+    if (!ok) return
+    setDeleting(true)
+    try {
+      await deleteUserAccount(user.uid)
+      onDeleted(user.uid)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const active = todos.filter(t => !t.done)
   const done   = todos.filter(t => t.done)
   const total  = todos.length + archived.length
@@ -241,6 +261,16 @@ function UserTodosRow({ user }: UserTodosRowProps) {
             </Typography>
           )}
           {loading && <CircularProgress size={12} sx={{ ml: 'auto', mr: 1 }} />}
+          <Button
+            size="small"
+            color="error"
+            variant="outlined"
+            onClick={handleDeleteAccount}
+            disabled={deleting}
+            sx={{ ml: expanded || loading ? 0 : 'auto', mr: 1, fontSize: 11, py: 0.25, px: 1, minWidth: 0, height: 24, borderColor: 'error.dark', '&:hover': { borderColor: 'error.main', bgcolor: 'rgba(239,68,68,0.08)' } }}
+          >
+            {deleting ? <CircularProgress size={12} color="error" /> : 'Delete'}
+          </Button>
         </Box>
       </AccordionSummary>
 
@@ -389,7 +419,13 @@ function UserTodosTab() {
         </Typography>
       )}
 
-      {users.map(u => <UserTodosRow key={u.uid} user={u} />)}
+      {users.map(u => (
+        <UserTodosRow
+          key={u.uid}
+          user={u}
+          onDeleted={uid => setUsers(prev => prev.filter(u => u.uid !== uid))}
+        />
+      ))}
     </Box>
   )
 }
