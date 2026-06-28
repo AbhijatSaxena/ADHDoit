@@ -448,7 +448,7 @@ export default function AdminPage() {
         sx={{ mb: 2.5, minHeight: 36, borderBottom: '1px solid #1f2937', '& .MuiTab-root': { minHeight: 36, fontSize: 12, textTransform: 'none', py: 0.5 } }}
       >
         <Tab label="Sessions" />
-        <Tab label="User Todos" />
+        <Tab label="User Management" />
       </Tabs>
 
       {tab === 0 && <SessionsTab />}
