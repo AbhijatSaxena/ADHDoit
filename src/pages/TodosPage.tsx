@@ -88,6 +88,22 @@ export default function TodosPage() {
 
   const handleSelect = useCallback((todo: Todo) => setSelectedTodo(todo), [])
 
+  async function handleConnect(blockerId: string, blockedId: string) {
+    const todo = todos.find(t => t.id === blockedId)
+    if (!todo) return
+    const updated = { ...todo, dependsOn: [...new Set([...(todo.dependsOn ?? []), blockerId])] }
+    await update(updated)
+    if (selectedTodo?.id === blockedId) setSelectedTodo(updated)
+  }
+
+  async function handleDisconnect(blockerId: string, blockedId: string) {
+    const todo = todos.find(t => t.id === blockedId)
+    if (!todo) return
+    const updated = { ...todo, dependsOn: (todo.dependsOn ?? []).filter(d => d !== blockerId) }
+    await update(updated)
+    if (selectedTodo?.id === blockedId) setSelectedTodo(updated)
+  }
+
   function openArchived() {
     setShowArchived(true)
     loadArchived()
@@ -165,7 +181,14 @@ export default function TodosPage() {
         </Button>
       </Box>
 
-      <TodoGraph todos={graphTodos} onSelect={handleSelect} focusedId={focusedId} paused={paused} />
+      <TodoGraph
+        todos={graphTodos}
+        onSelect={handleSelect}
+        onConnect={handleConnect}
+        onDisconnect={handleDisconnect}
+        focusedId={focusedId}
+        paused={paused}
+      />
 
       {/* Completed todos dialog */}
       <Dialog open={showCompleted} onClose={() => setShowCompleted(false)} maxWidth="sm" fullWidth>

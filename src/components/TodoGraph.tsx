@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { Box, Paper, Typography } from '@mui/material'
+import { Box, Paper, Typography, Tooltip } from '@mui/material'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import CommentOutlinedIcon from '@mui/icons-material/CommentOutlined'
 import * as dagre from '@dagrejs/dagre'
@@ -22,6 +22,21 @@ interface Edge {
   target: string
   done: boolean
   points: { x1: number; y1: number; x2: number; y2: number }
+}
+
+function wouldCreateCycle(todos: Todo[], blockerId: string, blockedId: string): boolean {
+  if (blockerId === blockedId) return true
+  const visited = new Set<string>()
+  const stack = [blockerId]
+  while (stack.length) {
+    const id = stack.pop()!
+    if (id === blockedId) return true
+    if (visited.has(id)) continue
+    visited.add(id)
+    const todo = todos.find(t => t.id === id)
+    if (todo) (todo.dependsOn ?? []).forEach(d => stack.push(d))
+  }
+  return false
 }
 
 function buildLayout(todos: Todo[]): { nodes: LayoutNode[]; edges: Edge[]; width: number; height: number } {
@@ -117,9 +132,14 @@ interface NodeCardProps {
   onClick: (todo: Todo) => void
   focused: boolean
   paused: boolean
+  onConnectStart: (e: React.MouseEvent) => void
+  isDropTarget: boolean
+  isDragSource: boolean
+  anyDrag: boolean
 }
 
-function NodeCard({ node, onClick, focused, paused }: NodeCardProps) {
+function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget, isDragSource, anyDrag }: NodeCardProps) {
+  const [hovered, setHovered] = useState(false)
   const { todo, x, y, blocked, pendingDepsCount } = node
   const status = todo.done ? 'done' : focused ? (paused ? 'paused' : 'focused') : blocked ? 'blocked' : 'available'
 
@@ -136,9 +156,19 @@ function NodeCard({ node, onClick, focused, paused }: NodeCardProps) {
     ? { boxShadow: '0 0 16px rgba(217,119,6,0.3), 0 0 0 1px rgba(217,119,6,0.2)' }
     : {}
 
+  const dropRing = isDropTarget
+    ? { outline: '2px solid #60a5fa', outlineOffset: '2px', boxShadow: '0 0 18px rgba(96,165,250,0.4)' }
+    : isDragSource
+    ? { outline: '2px solid #fbbf24', outlineOffset: '2px' }
+    : {}
+
+  const showHandle = (hovered || isDragSource) && !todo.done
+
   return (
     <Paper
-      onClick={() => onClick(todo)}
+      onClick={() => { if (!anyDrag) onClick(todo) }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       elevation={0}
       sx={{
         position: 'absolute',
@@ -146,7 +176,7 @@ function NodeCard({ node, onClick, focused, paused }: NodeCardProps) {
         top: y,
         width: NODE_W,
         height: NODE_H,
-        cursor: 'pointer',
+        cursor: anyDrag ? (isDropTarget ? 'crosshair' : 'default') : 'pointer',
         border: `1.5px solid ${borderColor}`,
         borderLeft: `4px solid ${accentColor}`,
         borderRadius: '10px',
@@ -156,9 +186,10 @@ function NodeCard({ node, onClick, focused, paused }: NodeCardProps) {
         flexDirection: 'column',
         justifyContent: 'space-between',
         p: '10px 12px',
-        transition: 'box-shadow 0.15s, border-color 0.15s',
+        transition: 'box-shadow 0.15s, border-color 0.15s, outline 0.1s',
         ...glowStyle,
-        '&:hover': {
+        ...dropRing,
+        '&:hover': anyDrag ? {} : {
           boxShadow: status === 'available'
             ? '0 0 20px rgba(34,197,94,0.3), 0 0 0 2px rgba(34,197,94,0.4)'
             : status === 'focused'
@@ -168,6 +199,33 @@ function NodeCard({ node, onClick, focused, paused }: NodeCardProps) {
         userSelect: 'none',
       }}
     >
+      {/* Connector handle — drag to wire a blocker */}
+      {showHandle && (
+        <Tooltip title="Drag to set as blocker for another todo" placement="top" arrow>
+          <Box
+            onMouseDown={e => { e.stopPropagation(); onConnectStart(e) }}
+            sx={{
+              position: 'absolute',
+              top: -8,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 14,
+              height: 14,
+              borderRadius: '50%',
+              bgcolor: '#2563eb',
+              border: '2px solid #93c5fd',
+              cursor: 'crosshair',
+              zIndex: 20,
+              transition: 'transform 0.1s, background-color 0.1s',
+              '&:hover': {
+                bgcolor: '#60a5fa',
+                transform: 'translateX(-50%) scale(1.25)',
+              },
+            }}
+          />
+        </Tooltip>
+      )}
+
       <Typography
         variant="body2"
         sx={{
@@ -209,16 +267,29 @@ function NodeCard({ node, onClick, focused, paused }: NodeCardProps) {
   )
 }
 
+interface DragState {
+  fromId: string
+  fromX: number
+  fromY: number
+  curX: number
+  curY: number
+}
+
 interface Props {
   todos: Todo[]
   onSelect: (todo: Todo) => void
+  onConnect: (blockerId: string, blockedId: string) => void
+  onDisconnect: (blockerId: string, blockedId: string) => void
   focusedId: string | null
   paused: boolean
 }
 
-export default function TodoGraph({ todos, onSelect, focusedId, paused }: Props) {
+export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, focusedId, paused }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const scaledRef    = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ w: 0, h: 520 })
+  const [drag, setDrag]           = useState<DragState | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
 
   useEffect(() => {
     const el = containerRef.current
@@ -237,9 +308,62 @@ export default function TodoGraph({ todos, onSelect, focusedId, paused }: Props)
     ? containerSize.w / width
     : 1
 
+  function toCanvas(e: React.MouseEvent): { x: number; y: number } {
+    const el = scaledRef.current
+    if (!el) return { x: 0, y: 0 }
+    const rect = el.getBoundingClientRect()
+    return { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale }
+  }
+
+  function handleConnectStart(e: React.MouseEvent, node: LayoutNode) {
+    e.preventDefault()
+    const { x, y } = toCanvas(e)
+    setDrag({
+      fromId: node.todo.id,
+      fromX: node.x + NODE_W / 2,
+      fromY: node.y,
+      curX: x,
+      curY: y,
+    })
+    setDropTarget(null)
+  }
+
+  function handleMouseMove(e: React.MouseEvent) {
+    if (!drag) return
+    const { x, y } = toCanvas(e)
+    setDrag(prev => prev ? { ...prev, curX: x, curY: y } : null)
+    const target = nodes.find(n =>
+      n.todo.id !== drag.fromId &&
+      x >= n.x && x <= n.x + NODE_W &&
+      y >= n.y && y <= n.y + NODE_H
+    )
+    setDropTarget(target?.todo.id ?? null)
+  }
+
+  function finishDrag() {
+    if (drag && dropTarget) {
+      const alreadyLinked = todos.find(t => t.id === dropTarget)?.dependsOn?.includes(drag.fromId)
+      if (!alreadyLinked && !wouldCreateCycle(todos, drag.fromId, dropTarget)) {
+        onConnect(drag.fromId, dropTarget)
+      }
+    }
+    setDrag(null)
+    setDropTarget(null)
+  }
+
+  // Cancel drag if mouse leaves container without releasing
+  useEffect(() => {
+    if (!drag) return
+    const cancel = () => { setDrag(null); setDropTarget(null) }
+    window.addEventListener('mouseup', cancel)
+    return () => window.removeEventListener('mouseup', cancel)
+  }, [!!drag])
+
   return (
     <Box
       ref={containerRef}
+      onMouseMove={handleMouseMove}
+      onMouseUp={finishDrag}
       sx={{
         height: Math.max(containerSize.h, 520),
         border: '1px solid #1f2937',
@@ -247,11 +371,14 @@ export default function TodoGraph({ todos, onSelect, focusedId, paused }: Props)
         bgcolor: '#030712',
         overflow: 'auto',
         position: 'relative',
+        cursor: drag ? 'crosshair' : 'default',
       }}
     >
       <div style={{ width: width * scale, height: height * scale, position: 'relative', flexShrink: 0 }}>
-        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0, width, height }}>
-
+        <div
+          ref={scaledRef}
+          style={{ transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0, width, height }}
+        >
           <svg
             style={{ position: 'absolute', top: 0, left: 0, width, height, pointerEvents: 'none', overflow: 'visible' }}
           >
@@ -262,6 +389,9 @@ export default function TodoGraph({ todos, onSelect, focusedId, paused }: Props)
               <marker id="arrow-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill="#7c3f3f" />
               </marker>
+              <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#60a5fa" />
+              </marker>
             </defs>
 
             {edges.map(e => {
@@ -271,18 +401,49 @@ export default function TodoGraph({ todos, onSelect, focusedId, paused }: Props)
               const d = `M ${x1} ${y1} C ${x1} ${mid1y}, ${x2} ${mid2y}, ${x2} ${y2}`
               const color = e.done ? '#16a34a' : '#7c3f3f'
               return (
-                <path
-                  key={`${e.source}-${e.target}`}
-                  d={d}
-                  stroke={color}
-                  strokeWidth={e.done ? 1.5 : 2}
-                  fill="none"
-                  strokeDasharray={e.done ? undefined : '5,4'}
-                  markerEnd={`url(#arrow-${e.done ? 'green' : 'red'})`}
-                  opacity={e.done ? 0.6 : 1}
-                />
+                <g key={`${e.source}-${e.target}`}>
+                  {/* Wide invisible hitbox for clicking the edge */}
+                  <path
+                    d={d}
+                    stroke="transparent"
+                    strokeWidth={12}
+                    fill="none"
+                    style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+                    onClick={() => onDisconnect(e.source, e.target)}
+                  />
+                  {/* Visible arrow */}
+                  <path
+                    d={d}
+                    stroke={color}
+                    strokeWidth={e.done ? 1.5 : 2}
+                    fill="none"
+                    strokeDasharray={e.done ? undefined : '5,4'}
+                    markerEnd={`url(#arrow-${e.done ? 'green' : 'red'})`}
+                    opacity={e.done ? 0.6 : 1}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                </g>
               )
             })}
+
+            {/* Ghost wire while dragging */}
+            {drag && (() => {
+              const { fromX, fromY, curX, curY } = drag
+              const mid1y = fromY + (curY - fromY) * 0.4
+              const mid2y = fromY + (curY - fromY) * 0.6
+              const dPath = `M ${fromX} ${fromY} C ${fromX} ${mid1y}, ${curX} ${mid2y}, ${curX} ${curY}`
+              return (
+                <path
+                  d={dPath}
+                  stroke="#60a5fa"
+                  strokeWidth={2}
+                  fill="none"
+                  strokeDasharray="6,4"
+                  markerEnd="url(#arrow-blue)"
+                  style={{ pointerEvents: 'none' }}
+                />
+              )
+            })()}
           </svg>
 
           <div style={{ position: 'relative', width, height }}>
@@ -293,6 +454,10 @@ export default function TodoGraph({ todos, onSelect, focusedId, paused }: Props)
                 onClick={onSelect}
                 focused={node.todo.id === focusedId}
                 paused={paused}
+                onConnectStart={e => handleConnectStart(e, node)}
+                isDropTarget={dropTarget === node.todo.id}
+                isDragSource={drag?.fromId === node.todo.id}
+                anyDrag={!!drag}
               />
             ))}
           </div>
