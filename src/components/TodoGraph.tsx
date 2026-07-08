@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { Box, Paper, Typography, Tooltip } from '@mui/material'
+import { Box, Paper, Typography, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import CommentOutlinedIcon from '@mui/icons-material/CommentOutlined'
 import * as dagre from '@dagrejs/dagre'
@@ -132,7 +132,7 @@ interface NodeCardProps {
   onClick: (todo: Todo) => void
   focused: boolean
   paused: boolean
-  onConnectStart: (e: React.MouseEvent) => void
+  onConnectStart: (e: React.MouseEvent, side: 'top' | 'bottom') => void
   isDropTarget: boolean
   isDragSource: boolean
   anyDrag: boolean
@@ -200,14 +200,14 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
         userSelect: 'none',
       }}
     >
-      {/* Connector handle — drag to wire a blocker */}
-      {showHandle && (
-        <Tooltip title="Drag to set as blocker for another todo" placement="top" arrow>
+      {/* Connector handles — drag to wire a blocker (top and bottom) */}
+      {showHandle && (['top', 'bottom'] as const).map(side => (
+        <Tooltip key={side} title="Drag to create dependency" placement={side} arrow>
           <Box
-            onMouseDown={e => { e.stopPropagation(); onConnectStart(e) }}
+            onMouseDown={e => { e.stopPropagation(); onConnectStart(e, side) }}
             sx={{
               position: 'absolute',
-              top: -8,
+              ...(side === 'top' ? { top: -8 } : { bottom: -8 }),
               left: '50%',
               transform: 'translateX(-50%)',
               width: 14,
@@ -225,7 +225,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
             }}
           />
         </Tooltip>
-      )}
+      ))}
 
       <Typography
         variant="body2"
@@ -292,6 +292,8 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
   const [drag, setDrag]             = useState<DragState | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null)
+  const [pendingConnect, setPendingConnect]       = useState<{ blockerId: string; blockedId: string } | null>(null)
+  const [pendingDisconnect, setPendingDisconnect] = useState<{ blockerId: string; blockedId: string } | null>(null)
 
   useEffect(() => {
     const el = containerRef.current
@@ -317,13 +319,13 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
     return { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale }
   }
 
-  function handleConnectStart(e: React.MouseEvent, node: LayoutNode) {
+  function handleConnectStart(e: React.MouseEvent, node: LayoutNode, side: 'top' | 'bottom') {
     e.preventDefault()
     const { x, y } = toCanvas(e)
     setDrag({
       fromId: node.todo.id,
       fromX: node.x + NODE_W / 2,
-      fromY: node.y,
+      fromY: side === 'top' ? node.y : node.y + NODE_H,
       curX: x,
       curY: y,
     })
@@ -346,7 +348,7 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
     if (drag && dropTarget) {
       const alreadyLinked = todos.find(t => t.id === dropTarget)?.dependsOn?.includes(drag.fromId)
       if (!alreadyLinked && !wouldCreateCycle(todos, drag.fromId, dropTarget)) {
-        onConnect(drag.fromId, dropTarget)
+        setPendingConnect({ blockerId: drag.fromId, blockedId: dropTarget })
       }
     }
     setDrag(null)
@@ -433,7 +435,7 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
                   {isHovered && (
                     <g
                       transform={`translate(${mx}, ${my})`}
-                      onClick={() => { onDisconnect(e.source, e.target); setHoveredEdge(null) }}
+                      onClick={() => { setPendingDisconnect({ blockerId: e.source, blockedId: e.target }); setHoveredEdge(null) }}
                       onMouseEnter={() => setHoveredEdge(key)}
                       onMouseLeave={() => setHoveredEdge(null)}
                       style={{ pointerEvents: 'all', cursor: 'pointer' }}
@@ -483,7 +485,7 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
                 onClick={onSelect}
                 focused={node.todo.id === focusedId}
                 paused={paused}
-                onConnectStart={e => handleConnectStart(e, node)}
+                onConnectStart={(e, side) => handleConnectStart(e, node, side)}
                 isDropTarget={dropTarget === node.todo.id}
                 isDragSource={drag?.fromId === node.todo.id}
                 anyDrag={!!drag}
@@ -500,6 +502,65 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
           <Typography variant="caption" color="text.disabled" sx={{ fontSize: 11 }}>Add your first todo above or use the AI assistant</Typography>
         </Box>
       )}
+
+      {/* Confirm: add dependency */}
+      <Dialog open={!!pendingConnect} onClose={() => setPendingConnect(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontSize: 14, pb: 1 }}>Add dependency?</DialogTitle>
+        <DialogContent sx={{ pb: 1 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 12, lineHeight: 1.6 }}>
+            <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
+              {todos.find(t => t.id === pendingConnect?.blockerId)?.text}
+            </Box>
+            {' will block '}
+            <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
+              {todos.find(t => t.id === pendingConnect?.blockedId)?.text}
+            </Box>
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button size="small" onClick={() => setPendingConnect(null)}>Cancel</Button>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => {
+              if (pendingConnect) onConnect(pendingConnect.blockerId, pendingConnect.blockedId)
+              setPendingConnect(null)
+            }}
+          >
+            Add
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirm: remove dependency */}
+      <Dialog open={!!pendingDisconnect} onClose={() => setPendingDisconnect(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontSize: 14, pb: 1 }}>Remove dependency?</DialogTitle>
+        <DialogContent sx={{ pb: 1 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 12, lineHeight: 1.6 }}>
+            <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
+              {todos.find(t => t.id === pendingDisconnect?.blockerId)?.text}
+            </Box>
+            {' will no longer block '}
+            <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
+              {todos.find(t => t.id === pendingDisconnect?.blockedId)?.text}
+            </Box>
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button size="small" onClick={() => setPendingDisconnect(null)}>Cancel</Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            onClick={() => {
+              if (pendingDisconnect) onDisconnect(pendingDisconnect.blockerId, pendingDisconnect.blockedId)
+              setPendingDisconnect(null)
+            }}
+          >
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
