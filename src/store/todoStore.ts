@@ -62,8 +62,21 @@ export const useTodoStore = create<TodoState>((set, get) => ({
 
   remove: async (id: string) => {
     await deleteTodo(uid(), id)
+
+    // Remove this id from dependsOn of all other todos
+    const affected = get().todos.filter(t => t.id !== id && t.dependsOn?.includes(id))
+    for (const t of affected) {
+      const updated = { ...t, dependsOn: t.dependsOn!.filter(d => d !== id) }
+      await saveTodo(uid(), updated as unknown as Record<string, unknown>)
+    }
+
     set(state => ({
-      todos: state.todos.filter(t => t.id !== id),
+      todos: state.todos
+        .filter(t => t.id !== id)
+        .map(t => affected.some(a => a.id === t.id)
+          ? { ...t, dependsOn: t.dependsOn!.filter(d => d !== id) }
+          : t
+        ),
       archivedTodos: state.archivedTodos.filter(t => t.id !== id),
     }))
   },
@@ -73,7 +86,22 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     if (!todo) return
     const archived = { ...todo, archived: true }
     await saveTodo(uid(), archived as unknown as Record<string, unknown>)
-    set(state => ({ todos: state.todos.filter(t => t.id !== id) }))
+
+    // Remove this id from dependsOn of all other active todos
+    const affected = get().todos.filter(t => t.id !== id && t.dependsOn?.includes(id))
+    for (const t of affected) {
+      const updated = { ...t, dependsOn: t.dependsOn!.filter(d => d !== id) }
+      await saveTodo(uid(), updated as unknown as Record<string, unknown>)
+    }
+
+    set(state => ({
+      todos: state.todos
+        .filter(t => t.id !== id)
+        .map(t => affected.some(a => a.id === t.id)
+          ? { ...t, dependsOn: t.dependsOn!.filter(d => d !== id) }
+          : t
+        ),
+    }))
   },
 
   unarchive: async (id: string) => {
