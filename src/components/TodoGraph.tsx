@@ -176,6 +176,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
         top: y,
         width: NODE_W,
         height: NODE_H,
+        pointerEvents: 'auto',
         cursor: anyDrag ? (isDropTarget ? 'crosshair' : 'default') : 'pointer',
         border: `1.5px solid ${borderColor}`,
         borderLeft: `4px solid ${accentColor}`,
@@ -381,7 +382,7 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
           style={{ transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0, width, height }}
         >
           <svg
-            style={{ position: 'absolute', top: 0, left: 0, width, height, pointerEvents: 'none', overflow: 'visible' }}
+            style={{ position: 'absolute', top: 0, left: 0, width, height, overflow: 'visible' }}
           >
             <defs>
               <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
@@ -426,7 +427,7 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
                     strokeDasharray={e.done && !isHovered ? undefined : '5,4'}
                     markerEnd={`url(#arrow-${isHovered ? 'red' : (e.done ? 'green' : 'red')})`}
                     opacity={e.done && !isHovered ? 0.6 : 1}
-                    style={{ pointerEvents: 'none' }}
+                    style={{ pointerEvents: 'none', transition: 'stroke 0.1s' }}
                   />
                   {/* X button at midpoint on hover */}
                   {isHovered && (
@@ -474,7 +475,7 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
             })()}
           </svg>
 
-          <div style={{ position: 'relative', width, height }}>
+          <div style={{ position: 'relative', width, height, pointerEvents: 'none' }}>
             {nodes.map(node => (
               <NodeCard
                 key={node.todo.id}
