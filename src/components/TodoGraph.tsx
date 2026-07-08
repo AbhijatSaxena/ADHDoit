@@ -45,7 +45,7 @@ function buildLayout(todos: Todo[]): { nodes: LayoutNode[]; edges: Edge[]; width
 
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'TB', ranksep: 80, nodesep: 50, marginx: 40, marginy: 40 })
+  g.setGraph({ rankdir: 'BT', ranksep: 80, nodesep: 50, marginx: 40, marginy: 40 })
 
   dagreTodos.forEach(t => g.setNode(t.id, { width: NODE_W, height: NODE_H }))
   dagreTodos.forEach(t =>
@@ -101,9 +101,9 @@ function buildLayout(todos: Todo[]): { nodes: LayoutNode[]; edges: Edge[]; width
         done: depDone,
         points: {
           x1: src.x + NODE_W / 2,
-          y1: src.y + NODE_H,
+          y1: src.y,
           x2: tgt.x + NODE_W / 2,
-          y2: tgt.y,
+          y2: tgt.y + NODE_H,
         },
       }]
     })
