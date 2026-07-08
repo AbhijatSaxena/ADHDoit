@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { Box, Paper, Typography, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material'
+import { Box, Paper, Typography, Tooltip } from '@mui/material'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import CommentOutlinedIcon from '@mui/icons-material/CommentOutlined'
 import * as dagre from '@dagrejs/dagre'
@@ -363,11 +363,17 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
     return () => window.removeEventListener('mouseup', cancel)
   }, [!!drag])
 
+  function dismissPending() {
+    setPendingConnect(null)
+    setPendingDisconnect(null)
+  }
+
   return (
     <Box
       ref={containerRef}
       onMouseMove={handleMouseMove}
       onMouseUp={finishDrag}
+      onClick={dismissPending}
       sx={{
         height: Math.max(containerSize.h, 520),
         border: '1px solid #1f2937',
@@ -403,54 +409,77 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
               const mid1y = y1 + (y2 - y1) * 0.4
               const mid2y = y1 + (y2 - y1) * 0.6
               const d = `M ${x1} ${y1} C ${x1} ${mid1y}, ${x2} ${mid2y}, ${x2} ${y2}`
-              const color = e.done ? '#16a34a' : '#7c3f3f'
               const key = `${e.source}-${e.target}`
               const mx = (x1 + x2) / 2
               const my = (y1 + y2) / 2
-              const isHovered = hoveredEdge === key && !drag
+              const isPendingDel = pendingDisconnect?.blockerId === e.source && pendingDisconnect?.blockedId === e.target
+              const isHovered = hoveredEdge === key && !drag && !isPendingDel
+              const strokeColor = isPendingDel ? '#ef4444' : isHovered ? '#f97316' : e.done ? '#16a34a' : '#7c3f3f'
+              const markerColor = isPendingDel ? 'red' : isHovered ? 'red' : e.done ? 'green' : 'red'
               return (
                 <g key={key}>
-                  {/* Wide invisible hitbox for hover detection */}
+                  {/* Wide invisible hitbox for hover + click */}
                   <path
                     d={d}
                     stroke="transparent"
                     strokeWidth={14}
                     fill="none"
-                    style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-                    onMouseEnter={() => setHoveredEdge(key)}
+                    style={{ pointerEvents: isPendingDel ? 'none' : 'stroke', cursor: 'pointer' }}
+                    onMouseEnter={() => !pendingDisconnect && setHoveredEdge(key)}
                     onMouseLeave={() => setHoveredEdge(null)}
+                    onClick={e2 => {
+                      e2.stopPropagation()
+                      setPendingDisconnect({ blockerId: e.source, blockedId: e.target })
+                      setHoveredEdge(null)
+                    }}
                   />
                   {/* Visible arrow */}
                   <path
                     d={d}
-                    stroke={isHovered ? '#ef4444' : color}
-                    strokeWidth={isHovered ? 2 : (e.done ? 1.5 : 2)}
+                    stroke={strokeColor}
+                    strokeWidth={isPendingDel ? 2 : isHovered ? 2 : e.done ? 1.5 : 2}
                     fill="none"
-                    strokeDasharray={e.done && !isHovered ? undefined : '5,4'}
-                    markerEnd={`url(#arrow-${isHovered ? 'red' : (e.done ? 'green' : 'red')})`}
-                    opacity={e.done && !isHovered ? 0.6 : 1}
+                    strokeDasharray={isPendingDel ? '5,4' : e.done && !isHovered ? undefined : '5,4'}
+                    markerEnd={`url(#arrow-${markerColor})`}
+                    opacity={e.done && !isHovered && !isPendingDel ? 0.6 : 1}
                     style={{ pointerEvents: 'none', transition: 'stroke 0.1s' }}
                   />
-                  {/* X button at midpoint on hover */}
+                  {/* Hover: X icon to initiate removal */}
                   {isHovered && (
                     <g
                       transform={`translate(${mx}, ${my})`}
-                      onClick={() => { setPendingDisconnect({ blockerId: e.source, blockedId: e.target }); setHoveredEdge(null) }}
                       onMouseEnter={() => setHoveredEdge(key)}
                       onMouseLeave={() => setHoveredEdge(null)}
+                      onClick={e2 => {
+                        e2.stopPropagation()
+                        setPendingDisconnect({ blockerId: e.source, blockedId: e.target })
+                        setHoveredEdge(null)
+                      }}
                       style={{ pointerEvents: 'all', cursor: 'pointer' }}
                     >
-                      <circle r={11} fill="#1f2937" stroke="#ef4444" strokeWidth={1.5} />
-                      <text
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fill="#ef4444"
-                        fontSize={14}
-                        fontWeight="bold"
-                        style={{ userSelect: 'none', pointerEvents: 'none' }}
+                      <circle r={11} fill="#1f2937" stroke="#f97316" strokeWidth={1.5} />
+                      <text textAnchor="middle" dominantBaseline="central" fill="#f97316" fontSize={14} fontWeight="bold" style={{ userSelect: 'none', pointerEvents: 'none' }}>×</text>
+                    </g>
+                  )}
+                  {/* Pending delete: ✓ / ✗ inline on the arrow */}
+                  {isPendingDel && (
+                    <g>
+                      <g
+                        transform={`translate(${mx - 16}, ${my})`}
+                        onClick={e2 => { e2.stopPropagation(); onDisconnect(e.source, e.target); setPendingDisconnect(null) }}
+                        style={{ pointerEvents: 'all', cursor: 'pointer' }}
                       >
-                        ×
-                      </text>
+                        <circle r={11} fill="#450a0a" stroke="#ef4444" strokeWidth={1.5} />
+                        <text textAnchor="middle" dominantBaseline="central" fill="#ef4444" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✓</text>
+                      </g>
+                      <g
+                        transform={`translate(${mx + 16}, ${my})`}
+                        onClick={e2 => { e2.stopPropagation(); setPendingDisconnect(null) }}
+                        style={{ pointerEvents: 'all', cursor: 'pointer' }}
+                      >
+                        <circle r={11} fill="#111827" stroke="#6b7280" strokeWidth={1.5} />
+                        <text textAnchor="middle" dominantBaseline="central" fill="#9ca3af" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✗</text>
+                      </g>
                     </g>
                   )}
                 </g>
@@ -464,15 +493,41 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
               const mid2y = fromY + (curY - fromY) * 0.6
               const dPath = `M ${fromX} ${fromY} C ${fromX} ${mid1y}, ${curX} ${mid2y}, ${curX} ${curY}`
               return (
-                <path
-                  d={dPath}
-                  stroke="#60a5fa"
-                  strokeWidth={2}
-                  fill="none"
-                  strokeDasharray="6,4"
-                  markerEnd="url(#arrow-blue)"
-                  style={{ pointerEvents: 'none' }}
-                />
+                <path d={dPath} stroke="#60a5fa" strokeWidth={2} fill="none" strokeDasharray="6,4" markerEnd="url(#arrow-blue)" style={{ pointerEvents: 'none' }} />
+              )
+            })()}
+
+            {/* Pending connect: preview arrow with inline ✓ / ✗ */}
+            {pendingConnect && (() => {
+              const src = nodes.find(n => n.todo.id === pendingConnect.blockerId)
+              const tgt = nodes.find(n => n.todo.id === pendingConnect.blockedId)
+              if (!src || !tgt) return null
+              const x1 = src.x + NODE_W / 2, y1 = src.y
+              const x2 = tgt.x + NODE_W / 2, y2 = tgt.y + NODE_H
+              const mid1y = y1 + (y2 - y1) * 0.4
+              const mid2y = y1 + (y2 - y1) * 0.6
+              const dPath = `M ${x1} ${y1} C ${x1} ${mid1y}, ${x2} ${mid2y}, ${x2} ${y2}`
+              const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
+              return (
+                <g>
+                  <path d={dPath} stroke="#60a5fa" strokeWidth={2} fill="none" strokeDasharray="6,4" markerEnd="url(#arrow-blue)" style={{ pointerEvents: 'none' }} />
+                  <g
+                    transform={`translate(${mx - 16}, ${my})`}
+                    onClick={e => { e.stopPropagation(); onConnect(pendingConnect.blockerId, pendingConnect.blockedId); setPendingConnect(null) }}
+                    style={{ pointerEvents: 'all', cursor: 'pointer' }}
+                  >
+                    <circle r={11} fill="#052e16" stroke="#22c55e" strokeWidth={1.5} />
+                    <text textAnchor="middle" dominantBaseline="central" fill="#22c55e" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✓</text>
+                  </g>
+                  <g
+                    transform={`translate(${mx + 16}, ${my})`}
+                    onClick={e => { e.stopPropagation(); setPendingConnect(null) }}
+                    style={{ pointerEvents: 'all', cursor: 'pointer' }}
+                  >
+                    <circle r={11} fill="#111827" stroke="#6b7280" strokeWidth={1.5} />
+                    <text textAnchor="middle" dominantBaseline="central" fill="#9ca3af" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✗</text>
+                  </g>
+                </g>
               )
             })()}
           </svg>
@@ -503,64 +558,6 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
         </Box>
       )}
 
-      {/* Confirm: add dependency */}
-      <Dialog open={!!pendingConnect} onClose={() => setPendingConnect(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontSize: 14, pb: 1 }}>Add dependency?</DialogTitle>
-        <DialogContent sx={{ pb: 1 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 12, lineHeight: 1.6 }}>
-            <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
-              {todos.find(t => t.id === pendingConnect?.blockerId)?.text}
-            </Box>
-            {' will block '}
-            <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
-              {todos.find(t => t.id === pendingConnect?.blockedId)?.text}
-            </Box>
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 2, pb: 2 }}>
-          <Button size="small" onClick={() => setPendingConnect(null)}>Cancel</Button>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={() => {
-              if (pendingConnect) onConnect(pendingConnect.blockerId, pendingConnect.blockedId)
-              setPendingConnect(null)
-            }}
-          >
-            Add
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Confirm: remove dependency */}
-      <Dialog open={!!pendingDisconnect} onClose={() => setPendingDisconnect(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontSize: 14, pb: 1 }}>Remove dependency?</DialogTitle>
-        <DialogContent sx={{ pb: 1 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 12, lineHeight: 1.6 }}>
-            <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
-              {todos.find(t => t.id === pendingDisconnect?.blockerId)?.text}
-            </Box>
-            {' will no longer block '}
-            <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
-              {todos.find(t => t.id === pendingDisconnect?.blockedId)?.text}
-            </Box>
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 2, pb: 2 }}>
-          <Button size="small" onClick={() => setPendingDisconnect(null)}>Cancel</Button>
-          <Button
-            size="small"
-            variant="contained"
-            color="error"
-            onClick={() => {
-              if (pendingDisconnect) onDisconnect(pendingDisconnect.blockerId, pendingDisconnect.blockedId)
-              setPendingDisconnect(null)
-            }}
-          >
-            Remove
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   )
 }
