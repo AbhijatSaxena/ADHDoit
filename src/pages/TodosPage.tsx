@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Box, CircularProgress, Button, Dialog, DialogTitle, DialogContent,
-  List, ListItem, ListItemText, IconButton, Typography, Chip, Tooltip,
+  List, ListItem, ListItemText, IconButton, Typography, Tooltip,
   TextField, InputAdornment,
 } from '@mui/material'
 import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined'
@@ -247,13 +247,10 @@ export default function TodosPage() {
               >
                 <ListItemText
                   primary={t.text}
-                  secondary={t.done ? 'Completed' : 'Incomplete'}
                   slotProps={{
                     primary: { style: { fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? '#6b7280' : undefined } },
-                    secondary: { style: { fontSize: 11 } },
                   }}
                 />
-                {t.done && <Chip label="Done" size="small" color="success" sx={{ height: 16, fontSize: 9, mr: 1 }} />}
               </ListItem>
             ))}
           </List>
