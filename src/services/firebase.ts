@@ -158,6 +158,12 @@ export async function revokeSession(sessionId: string) {
   await updateDoc(doc(db, 'sessions', sessionId), { revoked: true })
 }
 
+export async function deleteRevokedSessions(): Promise<number> {
+  const snap = await getDocs(query(collection(db, 'sessions'), where('revoked', '==', true)))
+  await Promise.all(snap.docs.map(d => deleteDoc(d.ref)))
+  return snap.docs.length
+}
+
 export function watchSession(sessionId: string, onRevoked: () => void): () => void {
   return onSnapshot(doc(db, 'sessions', sessionId), snap => {
     if (snap.exists() && snap.data().revoked === true) onRevoked()

@@ -13,7 +13,7 @@ import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined'
 import {
-  fetchAllSessions, revokeSession, fetchAllUsers, fetchTodos, fetchArchivedTodos,
+  fetchAllSessions, revokeSession, deleteRevokedSessions, fetchAllUsers, fetchTodos, fetchArchivedTodos,
   saveTodo, deleteTodo, deleteUserAccount,
 } from '../services/firebase'
 import type { Session, UserRecord } from '../services/firebase'
@@ -46,6 +46,7 @@ function SessionsTab() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [revoking, setRevoking] = useState<string | null>(null)
+  const [clearing, setClearing] = useState(false)
   const currentSessionId = useAuthStore(s => s.sessionId)
 
   const loadSessions = useCallback(async () => {
@@ -54,6 +55,24 @@ function SessionsTab() {
   }, [])
 
   useEffect(() => { loadSessions() }, [loadSessions])
+
+  async function handleClearRevoked() {
+    const revokedCount = sessions.filter(s => s.revoked).length
+    const ok = await confirm({
+      title: 'Clear revoked sessions',
+      message: `Permanently delete ${revokedCount} revoked session${revokedCount !== 1 ? 's' : ''}?`,
+      confirmLabel: 'Clear',
+      danger: true,
+    })
+    if (!ok) return
+    setClearing(true)
+    try {
+      await deleteRevokedSessions()
+      setSessions(prev => prev.filter(s => !s.revoked))
+    } finally {
+      setClearing(false)
+    }
+  }
 
   async function handleRevoke(session: Session) {
     if (session.id === currentSessionId) return
@@ -68,7 +87,19 @@ function SessionsTab() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mb: 1.5 }}>
+        {sessions.some(s => s.revoked) && (
+          <Button
+            size="small"
+            color="error"
+            variant="outlined"
+            onClick={handleClearRevoked}
+            disabled={clearing}
+            sx={{ fontSize: 11, textTransform: 'none', py: 0.25, px: 1.25, height: 26, borderColor: 'error.dark', '&:hover': { borderColor: 'error.main', bgcolor: 'rgba(239,68,68,0.08)' } }}
+          >
+            {clearing ? <CircularProgress size={12} color="error" /> : `Clear revoked (${sessions.filter(s => s.revoked).length})`}
+          </Button>
+        )}
         <Tooltip title="Refresh">
           <IconButton onClick={loadSessions} size="small" disabled={loading}>
             {loading ? <CircularProgress size={16} /> : <RefreshIcon sx={{ fontSize: 18 }} />}
