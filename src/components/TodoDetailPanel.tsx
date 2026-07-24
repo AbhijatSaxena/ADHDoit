@@ -324,6 +324,26 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
         {/* Blockers tab */}
         {tab === 1 && (
           <Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.75, display: 'block' }}>
+                Create new blocker
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="New blocking todo…"
+                  value={newBlockerText}
+                  onChange={e => setNewBlockerText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddBlocker()}
+                  sx={{ '& .MuiInputBase-root': { fontSize: 12 } }}
+                />
+                <IconButton size="small" onClick={handleAddBlocker} disabled={!newBlockerText.trim()} color="primary">
+                  <AddIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Box>
+            </Box>
+
             {activeDeps.length > 0 && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.75, display: 'block' }}>
@@ -366,26 +386,6 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
                 ))}
               </Box>
             )}
-
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.75, display: 'block' }}>
-                Create new blocker
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder="New blocking todo…"
-                  value={newBlockerText}
-                  onChange={e => setNewBlockerText(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleAddBlocker()}
-                  sx={{ '& .MuiInputBase-root': { fontSize: 12 } }}
-                />
-                <IconButton size="small" onClick={handleAddBlocker} disabled={!newBlockerText.trim()} color="primary">
-                  <AddIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-              </Box>
-            </Box>
 
             {(todo.dependsOn ?? []).length === 0 && linkableTodos.length === 0 && (
               <Typography variant="body2" color="text.disabled" sx={{ textAlign: 'center', py: 3, fontSize: 12 }}>
