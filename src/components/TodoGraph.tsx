@@ -144,17 +144,19 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
   const { todo, x, y, blocked, pendingDepsCount } = node
   const status = todo.done ? 'done' : focused ? (paused ? 'paused' : 'focused') : blocked ? 'blocked' : 'available'
 
-  const accentColor = status === 'done' ? '#374151' : status === 'focused' ? '#d97706' : status === 'paused' ? '#b45309' : status === 'blocked' ? '#7c3f3f' : '#22c55e'
-  const borderColor = status === 'done' ? '#1f2937' : status === 'focused' ? '#92400e' : status === 'paused' ? '#78350f' : status === 'blocked' ? '#3d1f1f' : '#14532d'
-  const bgColor     = status === 'done' ? '#0d1117' : status === 'focused' ? '#1a1000' : status === 'paused' ? '#110e00' : status === 'blocked' ? '#0d0808' : '#031a0e'
-  const textColor   = status === 'done' ? '#6b7280' : status === 'focused' ? '#fef3c7' : status === 'paused' ? '#d6b87a' : status === 'blocked' ? '#6b7280' : '#f0fdf4'
-  const statusColor = status === 'done' ? '#6b7280' : status === 'focused' ? '#fbbf24' : status === 'paused' ? '#92400e' : status === 'blocked' ? '#7c3f3f' : '#4ade80'
+  const accentColor = status === 'done' ? '#4b5563' : status === 'focused' ? '#f59e0b' : status === 'paused' ? '#f97316' : status === 'blocked' ? '#f87171' : '#22c55e'
+  const borderColor = status === 'done' ? '#374151' : status === 'focused' ? '#b45309' : status === 'paused' ? '#9a3412' : status === 'blocked' ? '#7f1d1d' : '#166534'
+  const bgColor     = status === 'done' ? '#161b24' : status === 'focused' ? '#1c0a00' : status === 'paused' ? '#1c0a00' : status === 'blocked' ? '#1c0a0a' : '#052e16'
+  const textColor   = status === 'done' ? '#9ca3af' : status === 'focused' ? '#fef3c7' : status === 'paused' ? '#fed7aa' : status === 'blocked' ? '#e5e7eb' : '#d1fae5'
+  const statusColor = status === 'done' ? '#9ca3af' : status === 'focused' ? '#fbbf24' : status === 'paused' ? '#fb923c' : status === 'blocked' ? '#fca5a5' : '#4ade80'
   const statusLabel = status === 'done' ? '✓ Done' : status === 'focused' ? '⏱ Focused' : status === 'paused' ? '⏸ Paused' : status === 'blocked' ? '🔒 Blocked' : '● Ready'
 
   const glowStyle = status === 'available'
-    ? { boxShadow: '0 0 12px rgba(34,197,94,0.18), 0 0 0 1px rgba(34,197,94,0.12)' }
+    ? { boxShadow: '0 0 16px rgba(34,197,94,0.22), 0 0 0 1px rgba(34,197,94,0.18)' }
     : status === 'focused'
-    ? { boxShadow: '0 0 16px rgba(217,119,6,0.3), 0 0 0 1px rgba(217,119,6,0.2)' }
+    ? { boxShadow: '0 0 18px rgba(245,158,11,0.35), 0 0 0 1px rgba(245,158,11,0.25)' }
+    : status === 'blocked'
+    ? { boxShadow: '0 0 10px rgba(248,113,113,0.12)' }
     : {}
 
   const dropRing = isDropTarget
@@ -183,7 +185,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
         borderLeft: `4px solid ${accentColor}`,
         borderRadius: '10px',
         bgcolor: bgColor,
-        opacity: status === 'done' ? 0.65 : status === 'blocked' ? 0.7 : status === 'paused' ? 0.75 : 1,
+        opacity: status === 'done' ? 0.72 : 1,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -193,10 +195,10 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
         ...dropRing,
         '&:hover': anyDrag ? {} : {
           boxShadow: status === 'available'
-            ? '0 0 20px rgba(34,197,94,0.3), 0 0 0 2px rgba(34,197,94,0.4)'
+            ? '0 0 22px rgba(34,197,94,0.38), 0 0 0 2px rgba(34,197,94,0.5)'
             : status === 'focused'
-            ? '0 0 24px rgba(217,119,6,0.45), 0 0 0 2px rgba(217,119,6,0.4)'
-            : `0 0 0 2px ${accentColor}55`,
+            ? '0 0 26px rgba(245,158,11,0.5), 0 0 0 2px rgba(245,158,11,0.5)'
+            : `0 0 0 2px ${accentColor}88`,
         },
         userSelect: 'none',
       }}
@@ -231,7 +233,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
       <Typography
         variant="body2"
         sx={{
-          fontSize: 12,
+          fontSize: 13,
           lineHeight: 1.45,
           color: textColor,
           textDecoration: todo.done ? 'line-through' : 'none',
@@ -247,7 +249,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
       </Typography>
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
-        <Typography sx={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', color: statusColor }}>
+        <Typography sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', color: statusColor }}>
           {statusLabel}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -312,7 +314,7 @@ interface Props {
 export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, onAddBlocker, focusedId, paused }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const scaledRef    = useRef<HTMLDivElement>(null)
-  const [containerSize, setContainerSize] = useState({ w: 0, h: 520 })
+  const [containerH, setContainerH] = useState(520)
   const [drag, setDrag]             = useState<DragState | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null)
@@ -324,25 +326,20 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => {
-      setContainerSize({ w: el.offsetWidth, h: window.innerHeight - 180 })
-    })
+    const updateH = () => setContainerH(window.innerHeight - 180)
+    const ro = new ResizeObserver(updateH)
     ro.observe(el)
-    setContainerSize({ w: el.offsetWidth, h: window.innerHeight - 180 })
+    updateH()
     return () => ro.disconnect()
   }, [])
 
   const { nodes, edges, width, height } = useMemo(() => buildLayout(todos), [todos])
 
-  const scale = containerSize.w > 0 && width > containerSize.w
-    ? containerSize.w / width
-    : 1
-
   function toCanvas(e: React.MouseEvent): { x: number; y: number } {
     const el = scaledRef.current
     if (!el) return { x: 0, y: 0 }
     const rect = el.getBoundingClientRect()
-    return { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
   }
 
   function handleConnectStart(e: React.MouseEvent, node: LayoutNode, side: 'top' | 'bottom') {
@@ -403,19 +400,19 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
       onMouseUp={finishDrag}
       onClick={dismissPending}
       sx={{
-        height: Math.max(containerSize.h, 520),
+        height: Math.max(containerH, 520),
         border: '1px solid #1f2937',
         borderRadius: 2,
-        bgcolor: '#030712',
+        bgcolor: '#080e1a',
         overflow: 'auto',
         position: 'relative',
         cursor: drag ? 'crosshair' : 'default',
       }}
     >
-      <div style={{ width: width * scale, height: height * scale, position: 'relative', flexShrink: 0 }}>
+      <div style={{ width, height, position: 'relative', flexShrink: 0 }}>
         <div
           ref={scaledRef}
-          style={{ transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0, width, height }}
+          style={{ position: 'absolute', top: 0, left: 0, width, height }}
         >
           <svg
             style={{ position: 'absolute', top: 0, left: 0, width, height, overflow: 'visible' }}
