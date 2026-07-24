@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { Box, Paper, Typography, Tooltip } from '@mui/material'
+import { Box, InputBase, Paper, Typography, Tooltip } from '@mui/material'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import CommentOutlinedIcon from '@mui/icons-material/CommentOutlined'
 import * as dagre from '@dagrejs/dagre'
@@ -136,9 +136,10 @@ interface NodeCardProps {
   isDropTarget: boolean
   isDragSource: boolean
   anyDrag: boolean
+  onAddBlockerRequest: (todoId: string) => void
 }
 
-function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget, isDragSource, anyDrag }: NodeCardProps) {
+function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget, isDragSource, anyDrag, onAddBlockerRequest }: NodeCardProps) {
   const [hovered, setHovered] = useState(false)
   const { todo, x, y, blocked, pendingDepsCount } = node
   const status = todo.done ? 'done' : focused ? (paused ? 'paused' : 'focused') : blocked ? 'blocked' : 'available'
@@ -262,6 +263,28 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
               <Typography sx={{ fontSize: 10, lineHeight: 1, fontWeight: 600 }}>{todo.commentCount}</Typography>
             </Box>
           )}
+          {hovered && !todo.done && !anyDrag && (
+            <Tooltip title="Add a new blocker" placement="bottom" arrow>
+              <Box
+                onClick={e => { e.stopPropagation(); onAddBlockerRequest(todo.id) }}
+                sx={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 15, height: 15, minWidth: 15, flexShrink: 0,
+                  borderRadius: '50%',
+                  bgcolor: '#0b1f10',
+                  border: '1px solid #22c55e55',
+                  color: '#4ade80',
+                  fontSize: 14,
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  '&:hover': { bgcolor: '#14532d', border: '1px solid #22c55e', color: '#86efac' },
+                }}
+              >
+                +
+              </Box>
+            </Tooltip>
+          )}
         </Box>
       </Box>
     </Paper>
@@ -281,11 +304,12 @@ interface Props {
   onSelect: (todo: Todo) => void
   onConnect: (blockerId: string, blockedId: string) => void
   onDisconnect: (blockerId: string, blockedId: string) => void
+  onAddBlocker: (parentId: string, text: string) => Promise<void>
   focusedId: string | null
   paused: boolean
 }
 
-export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, focusedId, paused }: Props) {
+export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, onAddBlocker, focusedId, paused }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const scaledRef    = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ w: 0, h: 520 })
@@ -294,6 +318,8 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null)
   const [pendingConnect, setPendingConnect]       = useState<{ blockerId: string; blockedId: string } | null>(null)
   const [pendingDisconnect, setPendingDisconnect] = useState<{ blockerId: string; blockedId: string } | null>(null)
+  const [addingBlockerFor, setAddingBlockerFor]   = useState<string | null>(null)
+  const [newBlockerText, setNewBlockerText]       = useState('')
 
   useEffect(() => {
     const el = containerRef.current
@@ -366,6 +392,8 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
   function dismissPending() {
     setPendingConnect(null)
     setPendingDisconnect(null)
+    setAddingBlockerFor(null)
+    setNewBlockerText('')
   }
 
   return (
@@ -486,6 +514,14 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
               )
             })}
 
+            {/* Dashed stem from node to temp tile when adding a blocker */}
+            {addingBlockerFor && (() => {
+              const n = nodes.find(x => x.todo.id === addingBlockerFor)
+              if (!n) return null
+              const cx = n.x + NODE_W / 2
+              return <path d={`M ${cx} ${n.y + NODE_H} L ${cx} ${n.y + NODE_H + 18}`} stroke="#22c55e55" strokeWidth={1.5} strokeDasharray="3,3" fill="none" style={{ pointerEvents: 'none' }} />
+            })()}
+
             {/* Ghost wire while dragging */}
             {drag && (() => {
               const { fromX, fromY, curX, curY } = drag
@@ -532,6 +568,69 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
             })()}
           </svg>
 
+          {/* Temp tile: inline input to create a new blocker */}
+          {addingBlockerFor && (() => {
+            const n = nodes.find(x => x.todo.id === addingBlockerFor)
+            if (!n) return null
+            return (
+              <Box
+                onClick={e => e.stopPropagation()}
+                sx={{
+                  position: 'absolute',
+                  left: n.x,
+                  top: n.y + NODE_H + 18,
+                  width: NODE_W,
+                  zIndex: 30,
+                  pointerEvents: 'auto',
+                }}
+              >
+                <Paper
+                  elevation={0}
+                  sx={{
+                    border: '1.5px dashed #22c55e55',
+                    borderLeft: '4px solid #22c55e55',
+                    borderRadius: '10px',
+                    bgcolor: '#031a0e',
+                    p: '8px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.5,
+                  }}
+                >
+                  <InputBase
+                    autoFocus
+                    value={newBlockerText}
+                    onChange={e => setNewBlockerText(e.target.value)}
+                    onKeyDown={async e => {
+                      if (e.key === 'Enter') {
+                        const text = newBlockerText.trim()
+                        const parentId = addingBlockerFor
+                        setAddingBlockerFor(null)
+                        setNewBlockerText('')
+                        if (text) await onAddBlocker(parentId, text)
+                      } else if (e.key === 'Escape') {
+                        setAddingBlockerFor(null)
+                        setNewBlockerText('')
+                      }
+                    }}
+                    placeholder="Type a blocker… (Enter to save)"
+                    fullWidth
+                    sx={{
+                      fontSize: 12,
+                      color: '#d1fae5',
+                      caretColor: '#22c55e',
+                      '& input': { p: 0 },
+                      '& input::placeholder': { color: '#4b5563', opacity: 1 },
+                    }}
+                  />
+                  <Typography sx={{ fontSize: 10, color: '#374151' }}>
+                    Enter to save · Esc or click away to cancel
+                  </Typography>
+                </Paper>
+              </Box>
+            )
+          })()}
+
           <div style={{ position: 'relative', width, height, pointerEvents: 'none' }}>
             {nodes.map(node => (
               <NodeCard
@@ -544,6 +643,7 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, fo
                 isDropTarget={dropTarget === node.todo.id}
                 isDragSource={drag?.fromId === node.todo.id}
                 anyDrag={!!drag}
+                onAddBlockerRequest={id => { setPendingConnect(null); setPendingDisconnect(null); setAddingBlockerFor(id); setNewBlockerText('') }}
               />
             ))}
           </div>

@@ -104,6 +104,16 @@ export default function TodosPage() {
     if (selectedTodo?.id === blockedId) setSelectedTodo(updated)
   }
 
+  async function handleAddBlocker(parentId: string, text: string) {
+    const newTodo = await add(text)
+    const parent = todos.find(t => t.id === parentId)
+    if (parent) {
+      const updated = { ...parent, dependsOn: [...new Set([...(parent.dependsOn ?? []), newTodo.id])] }
+      await update(updated)
+      if (selectedTodo?.id === parentId) setSelectedTodo(updated)
+    }
+  }
+
   function openArchived() {
     setShowArchived(true)
     loadArchived()
@@ -186,6 +196,7 @@ export default function TodosPage() {
         onSelect={handleSelect}
         onConnect={handleConnect}
         onDisconnect={handleDisconnect}
+        onAddBlocker={handleAddBlocker}
         focusedId={focusedId}
         paused={paused}
       />
