@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Box, CircularProgress, Button, Dialog, DialogTitle, DialogContent,
   List, ListItem, ListItemText, IconButton, Typography, Tooltip,
-  TextField, InputAdornment,
+  TextField, InputAdornment, useMediaQuery,
 } from '@mui/material'
 import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined'
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined'
@@ -15,9 +15,11 @@ import type { TodoAction } from '../services/ai'
 import TodoGraph from '../components/TodoGraph'
 import TodoDetailPanel from '../components/TodoDetailPanel'
 import TodoAiChat from '../components/TodoAiChat'
+import MobileTodoList from '../components/MobileTodoList'
 import { useTodoFocus } from '../hooks/useTodoFocus'
 
 export default function TodosPage() {
+  const isMobile = useMediaQuery('(max-width: 767px)')
   const { todos, archivedTodos, loading, loadingArchived, load, loadArchived, add, update, unarchive, archive, remove } = useTodoStore()
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null)
   const [showArchived, setShowArchived] = useState(false)
@@ -125,6 +127,10 @@ export default function TodosPage() {
         <CircularProgress size={32} />
       </Box>
     )
+  }
+
+  if (isMobile) {
+    return <MobileTodoList todos={todos} />
   }
 
   return (
