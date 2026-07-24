@@ -230,23 +230,25 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
         </Tooltip>
       ))}
 
-      <Typography
-        variant="body2"
-        sx={{
-          fontSize: 11,
-          lineHeight: 1.4,
-          color: textColor,
-          textDecoration: todo.done ? 'line-through' : 'none',
-          wordBreak: 'break-word',
-          flex: 1,
-          overflow: 'hidden',
-          display: '-webkit-box',
-          WebkitLineClamp: 3,
-          WebkitBoxOrient: 'vertical',
-        }}
-      >
-        {todo.text}
-      </Typography>
+      <Tooltip title={todo.text} placement="top" arrow enterDelay={600} enterNextDelay={600}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: 11,
+            lineHeight: 1.4,
+            color: textColor,
+            textDecoration: todo.done ? 'line-through' : 'none',
+            wordBreak: 'break-word',
+            flex: 1,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+          }}
+        >
+          {todo.text}
+        </Typography>
+      </Tooltip>
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
         <Typography sx={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.03em', color: statusColor }}>
