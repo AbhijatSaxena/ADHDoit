@@ -78,6 +78,7 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
 
   async function handleToggleDone() {
     await updateTodo({ ...todo, done: !todo.done })
+    if (!todo.done) onClose()
   }
 
   async function handleArchive() {
