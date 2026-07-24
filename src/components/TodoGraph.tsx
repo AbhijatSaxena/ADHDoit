@@ -6,8 +6,8 @@ import * as dagre from '@dagrejs/dagre'
 import type { Todo } from '../types'
 import { getPendingBlockers } from '../utils/todoUtils'
 
-const NODE_W = 220
-const NODE_H = 90
+const NODE_W = 165
+const NODE_H = 68
 
 interface LayoutNode {
   todo: Todo
@@ -189,7 +189,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        p: '10px 12px',
+        p: '7px 9px',
         transition: 'box-shadow 0.15s, border-color 0.15s, outline 0.1s',
         ...glowStyle,
         ...dropRing,
@@ -213,11 +213,11 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
               ...(side === 'top' ? { top: -8 } : { bottom: -8 }),
               left: '50%',
               transform: 'translateX(-50%)',
-              width: 14,
-              height: 14,
+              width: 11,
+              height: 11,
               borderRadius: '50%',
               bgcolor: '#2563eb',
-              border: '2px solid #93c5fd',
+              border: '1.5px solid #93c5fd',
               cursor: 'crosshair',
               zIndex: 20,
               transition: 'transform 0.1s, background-color 0.1s',
@@ -233,8 +233,8 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
       <Typography
         variant="body2"
         sx={{
-          fontSize: 13,
-          lineHeight: 1.45,
+          fontSize: 11,
+          lineHeight: 1.4,
           color: textColor,
           textDecoration: todo.done ? 'line-through' : 'none',
           wordBreak: 'break-word',
@@ -248,21 +248,21 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
         {todo.text}
       </Typography>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
-        <Typography sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', color: statusColor }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+        <Typography sx={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.03em', color: statusColor }}>
           {statusLabel}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           {pendingDepsCount > 0 && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3, color: '#a78bfa' }}>
-              <LockOutlinedIcon sx={{ fontSize: 11 }} />
-              <Typography sx={{ fontSize: 10, lineHeight: 1, fontWeight: 600 }}>{pendingDepsCount}</Typography>
+              <LockOutlinedIcon sx={{ fontSize: 9 }} />
+              <Typography sx={{ fontSize: 9, lineHeight: 1, fontWeight: 600 }}>{pendingDepsCount}</Typography>
             </Box>
           )}
           {(todo.commentCount ?? 0) > 0 && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3, color: '#93c5fd' }}>
-              <CommentOutlinedIcon sx={{ fontSize: 11 }} />
-              <Typography sx={{ fontSize: 10, lineHeight: 1, fontWeight: 600 }}>{todo.commentCount}</Typography>
+              <CommentOutlinedIcon sx={{ fontSize: 9 }} />
+              <Typography sx={{ fontSize: 9, lineHeight: 1, fontWeight: 600 }}>{todo.commentCount}</Typography>
             </Box>
           )}
           {hovered && !todo.done && !anyDrag && (
@@ -271,7 +271,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
                 onClick={e => { e.stopPropagation(); onAddBlockerRequest(todo.id) }}
                 sx={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 15, height: 15, minWidth: 15, flexShrink: 0,
+                  width: 13, height: 13, minWidth: 13, flexShrink: 0,
                   borderRadius: '50%',
                   bgcolor: '#0b1f10',
                   border: '1px solid #22c55e55',
