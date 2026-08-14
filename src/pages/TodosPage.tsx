@@ -9,6 +9,8 @@ import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import AddIcon from '@mui/icons-material/Add'
+import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined'
+import FormatListNumberedOutlinedIcon from '@mui/icons-material/FormatListNumberedOutlined'
 import { useTodoStore } from '../store/todoStore'
 import type { Todo } from '../types'
 import type { TodoAction } from '../services/ai'
@@ -17,6 +19,7 @@ import TodoDetailPanel from '../components/TodoDetailPanel'
 import TodoAiChat from '../components/TodoAiChat'
 import MobileTodoList from '../components/MobileTodoList'
 import { useTodoFocus } from '../hooks/useTodoFocus'
+import { getPendingBlockers } from '../utils/todoUtils'
 
 export default function TodosPage() {
   const isMobile = useMediaQuery('(max-width: 767px)')
@@ -26,6 +29,7 @@ export default function TodosPage() {
   const [showCompleted, setShowCompleted] = useState(false)
   const [newText, setNewText] = useState('')
   const [adding, setAdding] = useState(false)
+  const [view, setView] = useState<'tree' | 'priority'>('tree')
   const { focusedId, paused, accMs, focus, pause, resume, unfocus } = useTodoFocus()
 
   async function handleStop() {
@@ -81,6 +85,7 @@ export default function TodosPage() {
 
   const completedHidden = todos.filter(t => t.done)
   const graphTodos = todos.filter(t => !t.done)
+  const readyTodos = todos.filter(t => !t.done && getPendingBlockers(t, todos).length === 0)
 
   async function handleDepsChange(todo: Todo, deps: string[]) {
     const updated = { ...todo, dependsOn: deps }
@@ -174,7 +179,7 @@ export default function TodosPage() {
         />
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1.5 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <Button
           size="small"
           variant="outlined"
@@ -195,17 +200,61 @@ export default function TodosPage() {
         >
           Archived{archivedTodos.length > 0 ? ` (${archivedTodos.length})` : ''}
         </Button>
+        <Tooltip title={view === 'tree' ? 'Switch to priority list' : 'Switch to dependency tree'} arrow>
+          <IconButton
+            size="small"
+            onClick={() => setView(v => v === 'tree' ? 'priority' : 'tree')}
+            sx={{ color: view === 'priority' ? 'primary.main' : 'text.secondary', border: '1px solid', borderColor: view === 'priority' ? 'primary.main' : '#374151', borderRadius: 1.5, p: '4px' }}
+          >
+            {view === 'tree'
+              ? <FormatListNumberedOutlinedIcon sx={{ fontSize: 16 }} />
+              : <AccountTreeOutlinedIcon sx={{ fontSize: 16 }} />}
+          </IconButton>
+        </Tooltip>
       </Box>
 
-      <TodoGraph
-        todos={graphTodos}
-        onSelect={handleSelect}
-        onConnect={handleConnect}
-        onDisconnect={handleDisconnect}
-        onAddBlocker={handleAddBlocker}
-        focusedId={focusedId}
-        paused={paused}
-      />
+      {view === 'priority' ? (
+        <Box>
+          <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1.5 }}>
+            ● Ready to work on ({readyTodos.length})
+          </Typography>
+          {readyTodos.length === 0 ? (
+            <Typography sx={{ fontSize: 13, color: 'text.disabled', py: 2 }}>
+              No ready todos — everything is blocked or done.
+            </Typography>
+          ) : (
+            readyTodos.map((todo, i) => (
+              <Box
+                key={todo.id}
+                onClick={() => handleSelect(todo)}
+                sx={{
+                  display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 1.25, px: 1.5,
+                  mb: 0.75, borderRadius: '8px', cursor: 'pointer',
+                  bgcolor: '#052e16', border: '1px solid #166534', borderLeft: '3px solid #22c55e',
+                  '&:hover': { bgcolor: '#064a23' },
+                }}
+              >
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#4ade80', minWidth: 22, mt: '1px' }}>
+                  {i + 1}.
+                </Typography>
+                <Typography sx={{ fontSize: 13, color: '#d1fae5', lineHeight: 1.4 }}>
+                  {todo.text}
+                </Typography>
+              </Box>
+            ))
+          )}
+        </Box>
+      ) : (
+        <TodoGraph
+          todos={graphTodos}
+          onSelect={handleSelect}
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnect}
+          onAddBlocker={handleAddBlocker}
+          focusedId={focusedId}
+          paused={paused}
+        />
+      )}
 
       {/* Completed todos dialog */}
       <Dialog open={showCompleted} onClose={() => setShowCompleted(false)} maxWidth="sm" fullWidth>
