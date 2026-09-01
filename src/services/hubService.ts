@@ -84,6 +84,10 @@ export async function uncompleteHubTask(uid: string, taskId: string): Promise<vo
   await updateDoc(doc(db, 'users', uid, 'todos', taskId), { done: false, completedAt: null })
 }
 
+export async function renameHubTask(uid: string, taskId: string, text: string): Promise<void> {
+  await updateDoc(doc(db, 'users', uid, 'todos', taskId), { text })
+}
+
 export async function deleteHubTask(uid: string, taskId: string): Promise<void> {
   await deleteDoc(doc(db, 'users', uid, 'todos', taskId))
 }

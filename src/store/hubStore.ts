@@ -3,7 +3,7 @@ import { auth } from '../services/firebase'
 import type { Hub, HubTask } from '../services/hubService'
 import {
   fetchHubs, createHub, deleteHub,
-  fetchHubTasks, addHubTask, completeHubTask, uncompleteHubTask, deleteHubTask,
+  fetchHubTasks, addHubTask, completeHubTask, uncompleteHubTask, renameHubTask, deleteHubTask,
 } from '../services/hubService'
 
 function uid() {
@@ -25,6 +25,7 @@ interface HubStore {
   addTask: (hubId: string, text: string) => Promise<void>
   completeTask: (hubId: string, taskId: string) => Promise<void>
   uncompleteTask: (hubId: string, taskId: string) => Promise<void>
+  renameTask: (hubId: string, taskId: string, text: string) => Promise<void>
   removeTask: (hubId: string, taskId: string) => Promise<void>
 }
 
@@ -91,6 +92,18 @@ export const useHubStore = create<HubStore>((set, get) => ({
         ...s.tasks,
         [hubId]: (s.tasks[hubId] ?? []).map((t: HubTask) =>
           t.id === taskId ? { ...t, done: false, completedAt: null } : t
+        ),
+      },
+    }))
+  },
+
+  renameTask: async (hubId: string, taskId: string, text: string) => {
+    await renameHubTask(uid(), taskId, text)
+    set((s: HubStore) => ({
+      tasks: {
+        ...s.tasks,
+        [hubId]: (s.tasks[hubId] ?? []).map((t: HubTask) =>
+          t.id === taskId ? { ...t, text } : t
         ),
       },
     }))
