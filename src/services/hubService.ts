@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, deleteDoc, getDocs,
-  query, where, updateDoc, orderBy,
+  query, where, updateDoc,
 } from 'firebase/firestore'
 import { db } from './firebase'
 
@@ -27,11 +27,10 @@ function todosCol(uid: string) {
 }
 
 export async function fetchHubs(uid: string): Promise<Hub[]> {
-  const snap = await getDocs(query(todosCol(uid), where('type', '==', 'hub'), orderBy('order')))
-  return snap.docs.map(d => {
-    const data = d.data()
-    return { id: d.id, name: data.hubName, createdAt: data.createdAt, order: data.order }
-  })
+  const snap = await getDocs(query(todosCol(uid), where('type', '==', 'hub')))
+  return snap.docs
+    .map(d => { const data = d.data(); return { id: d.id, name: data.hubName, createdAt: data.createdAt, order: data.order } })
+    .sort((a, b) => a.order - b.order)
 }
 
 export async function createHub(uid: string, name: string, order: number): Promise<Hub> {
@@ -56,11 +55,10 @@ export async function deleteHub(uid: string, hubId: string): Promise<void> {
 }
 
 export async function fetchHubTasks(uid: string, hubId: string): Promise<HubTask[]> {
-  const snap = await getDocs(query(todosCol(uid), where('type', '==', 'hubTask'), where('hubId', '==', hubId), orderBy('createdAt')))
-  return snap.docs.map(d => {
-    const data = d.data()
-    return { id: d.id, text: data.text, createdAt: data.createdAt, completedAt: data.completedAt ?? null, done: data.done }
-  })
+  const snap = await getDocs(query(todosCol(uid), where('type', '==', 'hubTask'), where('hubId', '==', hubId)))
+  return snap.docs
+    .map(d => { const data = d.data(); return { id: d.id, text: data.text, createdAt: data.createdAt, completedAt: data.completedAt ?? null, done: data.done } })
+    .sort((a, b) => a.createdAt - b.createdAt)
 }
 
 export async function addHubTask(uid: string, hubId: string, text: string): Promise<HubTask> {
