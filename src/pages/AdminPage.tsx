@@ -1,23 +1,30 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Box, Typography, Table, TableBody, TableCell, TableHead, TableRow,
   IconButton, Tooltip, Chip, CircularProgress, Paper, Tabs, Tab,
   Accordion, AccordionSummary, AccordionDetails, List, ListItem,
-  ListItemText, Button,
+  ListItemText, Button, TextField, InputBase, Divider,
 } from '@mui/material'
 import LogoutIcon from '@mui/icons-material/Logout'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined'
+import AddIcon from '@mui/icons-material/Add'
 import {
   fetchAllSessions, revokeSession, deleteRevokedSessions, fetchAllUsers, fetchTodos, fetchArchivedTodos,
   saveTodo, deleteTodo, deleteUserAccount,
 } from '../services/firebase'
 import type { Session, UserRecord } from '../services/firebase'
 import type { Todo } from '../types'
+import {
+  fetchHubs, createHub, deleteHub,
+  fetchHubTasks, addHubTask, completeHubTask, uncompleteHubTask, renameHubTask, deleteHubTask,
+} from '../services/hubService'
+import type { Hub, HubTask } from '../services/hubService'
 import { useAuthStore } from '../store/authStore'
 import { confirm } from '../components/ConfirmDialog'
 
@@ -464,6 +471,387 @@ function UserTodosTab() {
   )
 }
 
+// ─── Admin Task Hubs tab ──────────────────────────────────────────────────────
+
+function formatDay(ts: number): string {
+  const d = new Date(ts)
+  const today = new Date()
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  if (sameDay(d, today)) return 'Today'
+  if (sameDay(d, yesterday)) return 'Yesterday'
+  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
+interface AdminTaskRowProps {
+  task: HubTask
+  completed?: boolean
+  onComplete: () => void
+  onRename: (text: string) => Promise<void>
+  onDelete: () => void
+}
+
+function AdminTaskRow({ task, completed, onComplete, onRename, onDelete }: AdminTaskRowProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(task.text)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function startEdit() {
+    if (completed) return
+    setDraft(task.text)
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  async function commit() {
+    const text = draft.trim()
+    if (!text || text === task.text) { setEditing(false); setDraft(task.text); return }
+    await onRename(text)
+    setEditing(false)
+  }
+
+  function handleKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); commit() }
+    if (e.key === 'Escape') { setEditing(false); setDraft(task.text) }
+  }
+
+  return (
+    <Box sx={{
+      display: 'flex', alignItems: 'center', gap: 1, px: 1.5,
+      py: completed ? 0.6 : 0.75, borderRadius: '6px', mb: 0.5,
+      bgcolor: completed ? '#052e16' : '#0d1117',
+      border: completed ? '1px solid #166534' : '1px solid #1f2937',
+      opacity: completed ? 0.85 : 1,
+    }}>
+      <Tooltip title={completed ? 'Mark incomplete' : 'Mark complete'}>
+        <IconButton size="small" onClick={onComplete}
+          sx={{ color: completed ? '#22c55e' : '#374151', '&:hover': { color: '#22c55e' }, p: '3px', flexShrink: 0 }}>
+          {completed
+            ? <CheckCircleIcon sx={{ fontSize: 16 }} />
+            : <CheckCircleOutlinedIcon sx={{ fontSize: 16 }} />}
+        </IconButton>
+      </Tooltip>
+
+      {editing ? (
+        <InputBase
+          inputRef={inputRef}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={handleKey}
+          onBlur={commit}
+          fullWidth autoFocus
+          sx={{ fontSize: 12, color: '#e5e7eb', flex: 1, '& input': { p: 0 }, bgcolor: '#1f2937', borderRadius: '4px', px: 0.75 }}
+        />
+      ) : (
+        <Tooltip title={completed ? '' : 'Double-click to rename'} placement="top" enterDelay={800}>
+          <Typography onDoubleClick={startEdit} sx={{
+            flex: 1, fontSize: 12,
+            color: completed ? '#86efac' : '#e5e7eb',
+            textDecoration: completed ? 'line-through' : 'none',
+            cursor: completed ? 'default' : 'text',
+            userSelect: 'none',
+          }}>
+            {task.text}
+          </Typography>
+        </Tooltip>
+      )}
+
+      {completed && (
+        <Typography sx={{ fontSize: 10, color: '#4ade80', whiteSpace: 'nowrap', mr: 0.5 }}>
+          {new Date(task.completedAt!).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+        </Typography>
+      )}
+
+      <Tooltip title="Delete">
+        <IconButton size="small" onClick={onDelete}
+          sx={{ color: '#374151', '&:hover': { color: 'error.main' }, p: '3px', flexShrink: 0 }}>
+          <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+        </IconButton>
+      </Tooltip>
+    </Box>
+  )
+}
+
+function AdminHubsTab() {
+  const [users, setUsers] = useState<UserRecord[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+  const [selectedUid, setSelectedUid] = useState<string | null>(null)
+
+  const [hubs, setHubs] = useState<Hub[]>([])
+  const [loadingHubs, setLoadingHubs] = useState(false)
+  const [selectedHubId, setSelectedHubId] = useState<string | null>(null)
+  const [newHubName, setNewHubName] = useState('')
+  const [addingHub, setAddingHub] = useState(false)
+
+  const [tasks, setTasks] = useState<HubTask[]>([])
+  const [loadingTasks, setLoadingTasks] = useState(false)
+  const [newTask, setNewTask] = useState('')
+  const [addingTask, setAddingTask] = useState(false)
+
+  useEffect(() => {
+    fetchAllUsers().then(u => { setUsers(u); setLoadingUsers(false) })
+  }, [])
+
+  useEffect(() => {
+    if (!selectedUid) { setHubs([]); setSelectedHubId(null); return }
+    setLoadingHubs(true)
+    fetchHubs(selectedUid).then(h => {
+      setHubs(h)
+      setLoadingHubs(false)
+      setSelectedHubId(prev => h.find(x => x.id === prev) ? prev : (h[0]?.id ?? null))
+    })
+  }, [selectedUid])
+
+  useEffect(() => {
+    if (!selectedUid || !selectedHubId) { setTasks([]); return }
+    setLoadingTasks(true)
+    fetchHubTasks(selectedUid, selectedHubId).then(t => { setTasks(t); setLoadingTasks(false) })
+  }, [selectedUid, selectedHubId])
+
+  async function handleAddHub() {
+    if (!selectedUid || !newHubName.trim()) return
+    setAddingHub(true)
+    const order = hubs.length > 0 ? Math.max(...hubs.map(h => h.order)) + 1 : 0
+    const hub = await createHub(selectedUid, newHubName.trim(), order)
+    setHubs(prev => [...prev, hub])
+    setSelectedHubId(hub.id)
+    setNewHubName('')
+    setAddingHub(false)
+  }
+
+  async function handleDeleteHub(hub: Hub) {
+    if (!selectedUid) return
+    const ok = await confirm({ title: 'Delete hub', message: `Delete hub "${hub.name}" and all its tasks?`, confirmLabel: 'Delete', danger: true })
+    if (!ok) return
+    await deleteHub(selectedUid, hub.id)
+    setHubs(prev => prev.filter(h => h.id !== hub.id))
+    setSelectedHubId(prev => prev === hub.id ? (hubs.find(h => h.id !== hub.id)?.id ?? null) : prev)
+    if (selectedHubId === hub.id) setTasks([])
+  }
+
+  async function handleAddTask() {
+    if (!selectedUid || !selectedHubId || !newTask.trim()) return
+    setAddingTask(true)
+    const task = await addHubTask(selectedUid, selectedHubId, newTask.trim())
+    setTasks(prev => [...prev, task])
+    setNewTask('')
+    setAddingTask(false)
+  }
+
+  async function handleComplete(task: HubTask) {
+    if (!selectedUid) return
+    if (task.done) {
+      await uncompleteHubTask(selectedUid, task.id)
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, done: false, completedAt: null } : t))
+    } else {
+      await completeHubTask(selectedUid, task.id)
+      const completedAt = Date.now()
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, done: true, completedAt } : t))
+    }
+  }
+
+  async function handleRename(task: HubTask, text: string) {
+    if (!selectedUid) return
+    await renameHubTask(selectedUid, task.id, text)
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, text } : t))
+  }
+
+  async function handleDeleteTask(task: HubTask) {
+    if (!selectedUid) return
+    const ok = await confirm({ title: 'Delete task', message: `Delete "${task.text}"?`, confirmLabel: 'Delete', danger: true })
+    if (!ok) return
+    await deleteHubTask(selectedUid, task.id)
+    setTasks(prev => prev.filter(t => t.id !== task.id))
+  }
+
+  const activeTasks = tasks.filter(t => !t.done)
+  const completedTasks = tasks.filter(t => t.done).sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
+
+  const grouped: { label: string; tasks: HubTask[] }[] = []
+  for (const t of completedTasks) {
+    const label = formatDay(t.completedAt!)
+    const g = grouped.find(g => g.label === label)
+    if (g) g.tasks.push(t)
+    else grouped.push({ label, tasks: [t] })
+  }
+
+  const selectedHub = hubs.find(h => h.id === selectedHubId)
+  const selectedUser = users.find(u => u.uid === selectedUid)
+
+  return (
+    <Box sx={{ display: 'flex', gap: 0, border: '1px solid #1f2937', borderRadius: 2, overflow: 'hidden', minHeight: 500 }}>
+
+      {/* Left pane: users */}
+      <Box sx={{ width: 200, flexShrink: 0, borderRight: '1px solid #1f2937', bgcolor: '#0f172a', display: 'flex', flexDirection: 'column' }}>
+        <Typography sx={{ px: 1.5, py: 1.25, fontSize: 10, fontWeight: 700, color: 'text.disabled', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #1f2937' }}>
+          Users
+        </Typography>
+        {loadingUsers ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={18} /></Box>
+        ) : (
+          <Box sx={{ overflowY: 'auto', flex: 1 }}>
+            {users.map(u => (
+              <Box
+                key={u.uid}
+                onClick={() => setSelectedUid(u.uid)}
+                sx={{
+                  px: 1.5, py: 1, cursor: 'pointer', borderBottom: '1px solid #1f2937',
+                  bgcolor: selectedUid === u.uid ? '#1e3a5f' : 'transparent',
+                  '&:hover': { bgcolor: selectedUid === u.uid ? '#1e3a5f' : '#111827' },
+                }}
+              >
+                <Typography sx={{ fontSize: 12, fontWeight: selectedUid === u.uid ? 600 : 400, color: selectedUid === u.uid ? '#93c5fd' : '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {u.email || u.uid}
+                </Typography>
+                {u.role === 'admin' && (
+                  <Typography sx={{ fontSize: 9, color: '#60a5fa' }}>admin</Typography>
+                )}
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Box>
+
+      {/* Right area */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {!selectedUid ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+            <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>Select a user to view their task hubs</Typography>
+          </Box>
+        ) : (
+          <>
+            {/* Hub bar */}
+            <Box sx={{ borderBottom: '1px solid #1f2937', bgcolor: '#0f172a', px: 1.5, py: 0.75, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', minHeight: 44 }}>
+              {loadingHubs ? (
+                <CircularProgress size={14} />
+              ) : hubs.length === 0 ? (
+                <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>No hubs yet</Typography>
+              ) : (
+                hubs.map(hub => (
+                  <Box key={hub.id} sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                    <Box
+                      onClick={() => setSelectedHubId(hub.id)}
+                      sx={{
+                        px: 1.25, py: 0.5, borderRadius: '6px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                        bgcolor: selectedHubId === hub.id ? '#1e3a5f' : '#111827',
+                        color: selectedHubId === hub.id ? '#93c5fd' : '#6b7280',
+                        border: selectedHubId === hub.id ? '1px solid #2563eb' : '1px solid #1f2937',
+                        '&:hover': { bgcolor: '#1e3a5f', color: '#93c5fd' },
+                      }}
+                    >
+                      {hub.name}
+                    </Box>
+                    <Tooltip title="Delete hub">
+                      <IconButton size="small" onClick={() => handleDeleteHub(hub)} sx={{ color: '#374151', '&:hover': { color: 'error.main' }, p: '2px' }}>
+                        <DeleteOutlineIcon sx={{ fontSize: 12 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                ))
+              )}
+
+              {/* Add hub inline */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
+                <InputBase
+                  placeholder="New hub…"
+                  value={newHubName}
+                  onChange={e => setNewHubName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddHub()}
+                  disabled={addingHub}
+                  sx={{ fontSize: 11, color: '#e5e7eb', bgcolor: '#111827', border: '1px solid #1f2937', borderRadius: '6px', px: 1, py: 0.5, width: 120, '& input': { p: 0 } }}
+                />
+                <Tooltip title="Add hub">
+                  <span>
+                    <IconButton size="small" onClick={handleAddHub} disabled={addingHub || !newHubName.trim()} sx={{ color: 'primary.main', p: '3px' }}>
+                      {addingHub ? <CircularProgress size={14} /> : <AddIcon sx={{ fontSize: 16 }} />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Box>
+            </Box>
+
+            {/* Task area */}
+            <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+              {selectedHub && (
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', mb: 1.5 }}>
+                  {selectedUser?.email} · {selectedHub.name} · {activeTasks.length} pending
+                </Typography>
+              )}
+
+              {/* Add task */}
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, maxWidth: 440 }}>
+                <TextField
+                  size="small" fullWidth placeholder="Add a task… (Enter)"
+                  value={newTask} onChange={e => setNewTask(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+                  disabled={addingTask || !selectedHubId}
+                  sx={{ '& .MuiInputBase-root': { fontSize: 12 } }}
+                />
+                <IconButton onClick={handleAddTask} disabled={addingTask || !newTask.trim() || !selectedHubId} color="primary" size="small">
+                  {addingTask ? <CircularProgress size={16} /> : <AddIcon />}
+                </IconButton>
+              </Box>
+
+              {loadingTasks ? (
+                <CircularProgress size={20} />
+              ) : !selectedHubId ? (
+                <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>Select a hub above</Typography>
+              ) : activeTasks.length === 0 && completedTasks.length === 0 ? (
+                <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>No tasks yet</Typography>
+              ) : (
+                <>
+                  {/* Active tasks */}
+                  {activeTasks.length > 0 && (
+                    <Box sx={{ mb: 2.5, maxWidth: 500 }}>
+                      {activeTasks.map(task => (
+                        <AdminTaskRow
+                          key={task.id}
+                          task={task}
+                          onComplete={() => handleComplete(task)}
+                          onRename={text => handleRename(task, text)}
+                          onDelete={() => handleDeleteTask(task)}
+                        />
+                      ))}
+                    </Box>
+                  )}
+
+                  {/* Completion history */}
+                  {completedTasks.length > 0 && (
+                    <Box sx={{ maxWidth: 500 }}>
+                      <Divider sx={{ mb: 2, borderColor: '#1f2937' }} />
+                      <Typography sx={{ fontSize: 10, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.06em', mb: 1.5 }}>
+                        Completion History
+                      </Typography>
+                      {grouped.map(({ label, tasks: dayTasks }) => (
+                        <Box key={label} sx={{ mb: 2 }}>
+                          <Typography sx={{ fontSize: 10, fontWeight: 600, color: '#4ade80', mb: 0.75 }}>
+                            {label} · {dayTasks.length} task{dayTasks.length !== 1 ? 's' : ''}
+                          </Typography>
+                          {dayTasks.map(task => (
+                            <AdminTaskRow
+                              key={task.id}
+                              task={task}
+                              completed
+                              onComplete={() => handleComplete(task)}
+                              onRename={text => handleRename(task, text)}
+                              onDelete={() => handleDeleteTask(task)}
+                            />
+                          ))}
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+          </>
+        )}
+      </Box>
+    </Box>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -483,10 +871,12 @@ export default function AdminPage() {
       >
         <Tab label="Sessions" />
         <Tab label="User Management" />
+        <Tab label="Task Hubs" />
       </Tabs>
 
       {tab === 0 && <SessionsTab />}
       {tab === 1 && <UserTodosTab />}
+      {tab === 2 && <AdminHubsTab />}
     </Box>
   )
 }
