@@ -19,6 +19,14 @@ service cloud.firestore {
           allow read, write: if isAuth() && (request.auth.uid == uid || isAdmin());
         }
       }
+
+      match /hubs/{hubId} {
+        allow read, write: if isAuth() && request.auth.uid == uid;
+
+        match /tasks/{taskId} {
+          allow read, write: if isAuth() && request.auth.uid == uid;
+        }
+      }
     }
 
     match /sessions/{sessionId} {
