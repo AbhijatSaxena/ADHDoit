@@ -19,7 +19,7 @@ interface HubStore {
   addHub: (name: string) => Promise<Hub>
   removeHub: (hubId: string) => Promise<void>
 
-  tasks: Record<string, HubTask[]>  // hubId -> tasks
+  tasks: Record<string, HubTask[]>
   loadingTasks: Record<string, boolean>
   loadTasks: (hubId: string) => Promise<void>
   addTask: (hubId: string, text: string) => Promise<void>
@@ -42,25 +42,25 @@ export const useHubStore = create<HubStore>((set, get) => ({
 
   addHub: async (name: string) => {
     const hubs = get().hubs
-    const order = hubs.length > 0 ? Math.max(...hubs.map(h => h.order)) + 1 : 0
+    const order = hubs.length > 0 ? Math.max(...hubs.map((h: Hub) => h.order)) + 1 : 0
     const hub = await createHub(uid(), name, order)
-    set(s => ({ hubs: [...s.hubs, hub] }))
+    set((s: HubStore) => ({ hubs: [...s.hubs, hub] }))
     return hub
   },
 
   removeHub: async (hubId: string) => {
     await deleteHub(uid(), hubId)
-    set(s => {
+    set((s: HubStore) => {
       const tasks = { ...s.tasks }
       delete tasks[hubId]
-      return { hubs: s.hubs.filter(h => h.id !== hubId), tasks }
+      return { hubs: s.hubs.filter((h: Hub) => h.id !== hubId), tasks }
     })
   },
 
   loadTasks: async (hubId: string) => {
-    set(s => ({ loadingTasks: { ...s.loadingTasks, [hubId]: true } }))
+    set((s: HubStore) => ({ loadingTasks: { ...s.loadingTasks, [hubId]: true } }))
     const tasks = await fetchHubTasks(uid(), hubId)
-    set(s => ({
+    set((s: HubStore) => ({
       tasks: { ...s.tasks, [hubId]: tasks },
       loadingTasks: { ...s.loadingTasks, [hubId]: false },
     }))
@@ -68,16 +68,16 @@ export const useHubStore = create<HubStore>((set, get) => ({
 
   addTask: async (hubId: string, text: string) => {
     const task = await addHubTask(uid(), hubId, text)
-    set(s => ({ tasks: { ...s.tasks, [hubId]: [...(s.tasks[hubId] ?? []), task] } }))
+    set((s: HubStore) => ({ tasks: { ...s.tasks, [hubId]: [...(s.tasks[hubId] ?? []), task] } }))
   },
 
   completeTask: async (hubId: string, taskId: string) => {
-    await completeHubTask(uid(), hubId, taskId)
+    await completeHubTask(uid(), taskId)
     const completedAt = Date.now()
-    set(s => ({
+    set((s: HubStore) => ({
       tasks: {
         ...s.tasks,
-        [hubId]: (s.tasks[hubId] ?? []).map(t =>
+        [hubId]: (s.tasks[hubId] ?? []).map((t: HubTask) =>
           t.id === taskId ? { ...t, done: true, completedAt } : t
         ),
       },
@@ -85,11 +85,11 @@ export const useHubStore = create<HubStore>((set, get) => ({
   },
 
   uncompleteTask: async (hubId: string, taskId: string) => {
-    await uncompleteHubTask(uid(), hubId, taskId)
-    set(s => ({
+    await uncompleteHubTask(uid(), taskId)
+    set((s: HubStore) => ({
       tasks: {
         ...s.tasks,
-        [hubId]: (s.tasks[hubId] ?? []).map(t =>
+        [hubId]: (s.tasks[hubId] ?? []).map((t: HubTask) =>
           t.id === taskId ? { ...t, done: false, completedAt: null } : t
         ),
       },
@@ -97,11 +97,11 @@ export const useHubStore = create<HubStore>((set, get) => ({
   },
 
   removeTask: async (hubId: string, taskId: string) => {
-    await deleteHubTask(uid(), hubId, taskId)
-    set(s => ({
+    await deleteHubTask(uid(), taskId)
+    set((s: HubStore) => ({
       tasks: {
         ...s.tasks,
-        [hubId]: (s.tasks[hubId] ?? []).filter(t => t.id !== taskId),
+        [hubId]: (s.tasks[hubId] ?? []).filter((t: HubTask) => t.id !== taskId),
       },
     }))
   },
