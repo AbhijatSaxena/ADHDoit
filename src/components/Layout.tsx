@@ -1,12 +1,17 @@
+import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Typography, Tooltip, BottomNavigation, BottomNavigationAction, Paper,
 } from '@mui/material'
 import { useAuthStore } from '../store/authStore'
+import { useHubStore } from '../store/hubStore'
 
-const navItems = [
+const staticNavItems = [
   { to: '/todos', label: 'Todos', icon: '✅', adminOnly: false },
+  { to: '/hub',   label: 'Task Hub', icon: '📋', adminOnly: false },
+]
+const adminNavItems = [
   { to: '/admin', label: 'Admin', icon: '🔐', adminOnly: true },
 ]
 
@@ -14,6 +19,9 @@ const SIDEBAR_W = 200
 
 export default function Layout() {
   const { user, role, signOut } = useAuthStore()
+  const { hubs, loadHubs } = useHubStore()
+
+  useEffect(() => { loadHubs() }, [])
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -46,29 +54,43 @@ export default function Layout() {
         </Box>
 
         {/* Nav links */}
-        <List sx={{ flex: 1, px: 1, py: 1.5 }} disablePadding>
-          {navItems.filter(n => !n.adminOnly || role === 'admin').map(({ to, label, icon }) => (
+        <List sx={{ flex: 1, px: 1, py: 1.5, overflowY: 'auto' }} disablePadding>
+          {/* Static items (Todos, Task Hub) */}
+          {staticNavItems.map(({ to, label, icon }) => (
+            <NavLink key={to} to={to} end style={{ textDecoration: 'none' }}>
+              {({ isActive }) => (
+                <ListItem disablePadding sx={{ mb: 0.25 }}>
+                  <ListItemButton selected={isActive} sx={{ borderRadius: 2, py: 1, minHeight: 36, '&.Mui-selected': { bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } } }}>
+                    <ListItemIcon sx={{ minWidth: 28, fontSize: 16 }}>{icon}</ListItemIcon>
+                    <ListItemText primary={label} slotProps={{ primary: { style: { fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? 'white' : '#9ca3af' } } }} />
+                  </ListItemButton>
+                </ListItem>
+              )}
+            </NavLink>
+          ))}
+
+          {/* Hub sub-items */}
+          {hubs.map(hub => (
+            <NavLink key={hub.id} to={`/hub/${hub.id}`} style={{ textDecoration: 'none' }}>
+              {({ isActive }) => (
+                <ListItem disablePadding sx={{ mb: 0.25, pl: 1.5 }}>
+                  <ListItemButton selected={isActive} sx={{ borderRadius: 2, py: 0.75, minHeight: 32, '&.Mui-selected': { bgcolor: '#1e3a5f', '&:hover': { bgcolor: '#1e3a5f' } } }}>
+                    <ListItemIcon sx={{ minWidth: 22, fontSize: 11, color: isActive ? '#60a5fa' : '#6b7280' }}>▸</ListItemIcon>
+                    <ListItemText primary={hub.name} slotProps={{ primary: { style: { fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? '#93c5fd' : '#6b7280' } } }} />
+                  </ListItemButton>
+                </ListItem>
+              )}
+            </NavLink>
+          ))}
+
+          {/* Admin */}
+          {adminNavItems.filter(() => role === 'admin').map(({ to, label, icon }) => (
             <NavLink key={to} to={to} style={{ textDecoration: 'none' }}>
               {({ isActive }) => (
                 <ListItem disablePadding sx={{ mb: 0.25 }}>
-                  <ListItemButton
-                    selected={isActive}
-                    sx={{
-                      borderRadius: 2,
-                      py: 1,
-                      minHeight: 36,
-                      '&.Mui-selected': { bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } },
-                    }}
-                  >
+                  <ListItemButton selected={isActive} sx={{ borderRadius: 2, py: 1, minHeight: 36, '&.Mui-selected': { bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } } }}>
                     <ListItemIcon sx={{ minWidth: 28, fontSize: 16 }}>{icon}</ListItemIcon>
-                    <ListItemText
-                      primary={label}
-                      slotProps={{
-                        primary: {
-                          style: { fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? 'white' : '#9ca3af' },
-                        },
-                      }}
-                    />
+                    <ListItemText primary={label} slotProps={{ primary: { style: { fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? 'white' : '#9ca3af' } } }} />
                   </ListItemButton>
                 </ListItem>
               )}
@@ -140,7 +162,7 @@ export default function Layout() {
         elevation={0}
       >
         <BottomNavigation sx={{ bgcolor: 'transparent', height: 56 }}>
-          {navItems.filter(n => !n.adminOnly || role === 'admin').map(({ to, label, icon }) => (
+          {[...staticNavItems, ...(role === 'admin' ? adminNavItems : [])].map(({ to, label, icon }) => (
             <NavLink key={to} to={to} style={{ textDecoration: 'none', flex: 1 }}>
               {({ isActive }) => (
                 <BottomNavigationAction
