@@ -17,6 +17,7 @@ export interface HubTask {
   createdAt: number
   completedAt: number | null
   done: boolean
+  priority: boolean
 }
 
 // Hubs and hub tasks are stored inside users/{uid}/todos with a `type` field
@@ -57,7 +58,7 @@ export async function deleteHub(uid: string, hubId: string): Promise<void> {
 export async function fetchHubTasks(uid: string, hubId: string): Promise<HubTask[]> {
   const snap = await getDocs(query(todosCol(uid), where('type', '==', 'hubTask'), where('hubId', '==', hubId)))
   return snap.docs
-    .map(d => { const data = d.data(); return { id: d.id, text: data.text, createdAt: data.createdAt, completedAt: data.completedAt ?? null, done: data.done } })
+    .map(d => { const data = d.data(); return { id: d.id, text: data.text, createdAt: data.createdAt, completedAt: data.completedAt ?? null, done: data.done, priority: data.priority ?? false } })
     .sort((a, b) => a.createdAt - b.createdAt)
 }
 
@@ -73,7 +74,11 @@ export async function addHubTask(uid: string, hubId: string, text: string): Prom
     archived: true, // hidden from the regular todos view
     order: now,
   })
-  return { id: ref.id, text, createdAt: now, completedAt: null, done: false }
+  return { id: ref.id, text, createdAt: now, completedAt: null, done: false, priority: false }
+}
+
+export async function setPriorityHubTask(uid: string, taskId: string, priority: boolean): Promise<void> {
+  await updateDoc(doc(db, 'users', uid, 'todos', taskId), { priority })
 }
 
 export async function completeHubTask(uid: string, taskId: string): Promise<void> {

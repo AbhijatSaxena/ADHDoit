@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Box, Typography, TextField, IconButton, CircularProgress,
-  Tooltip, Divider, InputBase,
+  Tooltip, Divider, InputBase, Chip,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
+import FlagIcon from '@mui/icons-material/Flag'
+import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined'
 import { useHubStore } from '../store/hubStore'
 import type { HubTask } from '../services/hubService'
 import { confirm } from '../components/ConfirmDialog'
@@ -37,10 +39,11 @@ interface TaskRowProps {
   onComplete: () => void
   onRename: (text: string) => Promise<void>
   onDelete: () => void
+  onSetPriority?: (priority: boolean) => void
   completed?: boolean
 }
 
-function TaskRow({ task, onComplete, onRename, onDelete, completed }: TaskRowProps) {
+function TaskRow({ task, onComplete, onRename, onDelete, onSetPriority, completed }: TaskRowProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft]     = useState(task.text)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -64,8 +67,8 @@ function TaskRow({ task, onComplete, onRename, onDelete, completed }: TaskRowPro
     if (e.key === 'Escape') { setEditing(false); setDraft(task.text) }
   }
 
-  const bg     = completed ? '#052e16' : '#0d1117'
-  const border = completed ? '1px solid #166534' : '1px solid #1f2937'
+  const bg     = completed ? '#052e16' : task.priority ? '#1c0a00' : '#0d1117'
+  const border = completed ? '1px solid #166534' : task.priority ? '1px solid #92400e' : '1px solid #1f2937'
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: completed ? 0.75 : 1, borderRadius: '8px', mb: 0.5, bgcolor: bg, border, opacity: completed ? 0.85 : 1 }}>
@@ -95,10 +98,11 @@ function TaskRow({ task, onComplete, onRename, onDelete, completed }: TaskRowPro
             onDoubleClick={startEdit}
             sx={{
               flex: 1, fontSize: 13,
-              color: completed ? '#86efac' : '#e5e7eb',
+              color: completed ? '#86efac' : task.priority ? '#fcd34d' : '#e5e7eb',
               textDecoration: completed ? 'line-through' : 'none',
               cursor: completed ? 'default' : 'text',
               userSelect: 'none',
+              fontWeight: task.priority && !completed ? 500 : 400,
             }}
           >
             {task.text}
@@ -110,6 +114,15 @@ function TaskRow({ task, onComplete, onRename, onDelete, completed }: TaskRowPro
         <Typography sx={{ fontSize: 11, color: '#4ade80', whiteSpace: 'nowrap', mr: 0.5 }}>
           {new Date(task.completedAt!).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
         </Typography>
+      )}
+
+      {!completed && onSetPriority && (
+        <Tooltip title={task.priority ? 'Remove priority' : 'Mark high priority'}>
+          <IconButton size="small" onClick={() => onSetPriority(!task.priority)}
+            sx={{ color: task.priority ? '#f59e0b' : '#374151', '&:hover': { color: '#f59e0b' }, p: '4px', flexShrink: 0 }}>
+            {task.priority ? <FlagIcon sx={{ fontSize: 16 }} /> : <FlagOutlinedIcon sx={{ fontSize: 16 }} />}
+          </IconButton>
+        </Tooltip>
       )}
 
       <Tooltip title="Delete">
@@ -124,14 +137,17 @@ function TaskRow({ task, onComplete, onRename, onDelete, completed }: TaskRowPro
 
 export default function HubDetailPage() {
   const { hubId } = useParams<{ hubId: string }>()
-  const { hubs, loadHubs, tasks, loadingTasks, loadTasks, addTask, completeTask, uncompleteTask, renameTask, removeTask } = useHubStore()
-  const [newText, setNewText] = useState('')
-  const [adding, setAdding]   = useState(false)
+  const { hubs, loadHubs, tasks, loadingTasks, loadTasks, addTask, completeTask, uncompleteTask, renameTask, setPriority, removeTask } = useHubStore()
+  const [newText, setNewText]           = useState('')
+  const [adding, setAdding]             = useState(false)
+  const [priorityOnly, setPriorityOnly] = useState(false)
 
   const hub        = hubs.find(h => h.id === hubId)
   const hubTasks   = hubId ? (tasks[hubId] ?? []) : []
   const isLoading  = hubId ? (loadingTasks[hubId] ?? false) : false
-  const activeTasks    = hubTasks.filter(t => !t.done)
+  const allActive      = hubTasks.filter(t => !t.done)
+  const activeTasks    = priorityOnly ? allActive.filter(t => t.priority) : allActive
+  const priorityCount  = allActive.filter(t => t.priority).length
   const completedTasks = hubTasks.filter(t => t.done).sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
   const grouped        = groupByDay(completedTasks)
 
@@ -161,9 +177,27 @@ export default function HubDetailPage() {
   return (
     <Box>
       <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, fontSize: 18 }}>{hub?.name ?? '…'}</Typography>
-      <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 3 }}>
-        Task queue · {activeTasks.length} pending
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+        <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+          Task queue · {allActive.length} pending
+        </Typography>
+        {priorityCount > 0 && (
+          <Chip
+            icon={<FlagIcon sx={{ fontSize: '14px !important', color: priorityOnly ? '#fff' : '#f59e0b' }} />}
+            label={`High priority${priorityOnly ? '' : ` · ${priorityCount}`}`}
+            size="small"
+            onClick={() => setPriorityOnly(v => !v)}
+            sx={{
+              height: 22, fontSize: 11, fontWeight: 500, cursor: 'pointer',
+              bgcolor: priorityOnly ? '#92400e' : 'transparent',
+              border: '1px solid #92400e',
+              color: priorityOnly ? '#fff' : '#f59e0b',
+              '& .MuiChip-label': { px: 1 },
+              '&:hover': { bgcolor: priorityOnly ? '#78350f' : 'rgba(146,64,14,0.15)' },
+            }}
+          />
+        )}
+      </Box>
 
       {/* Add task */}
       <Box sx={{ display: 'flex', gap: 1, mb: 3, maxWidth: 480 }}>
@@ -181,7 +215,9 @@ export default function HubDetailPage() {
       {isLoading ? (
         <CircularProgress size={24} />
       ) : activeTasks.length === 0 ? (
-        <Typography sx={{ fontSize: 13, color: 'text.disabled', mb: 3 }}>Queue is empty — all tasks done!</Typography>
+        <Typography sx={{ fontSize: 13, color: 'text.disabled', mb: 3 }}>
+          {priorityOnly ? 'No high-priority tasks.' : 'Queue is empty — all tasks done!'}
+        </Typography>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', mb: 4, maxWidth: 560 }}>
           {activeTasks.map(task => (
@@ -190,6 +226,7 @@ export default function HubDetailPage() {
               task={task}
               onComplete={() => hubId && completeTask(hubId, task.id)}
               onRename={text => renameTask(hubId!, task.id, text)}
+              onSetPriority={p => setPriority(hubId!, task.id, p)}
               onDelete={() => handleDelete(task)}
             />
           ))}

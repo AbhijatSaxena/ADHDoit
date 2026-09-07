@@ -14,6 +14,8 @@ import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined'
 import AddIcon from '@mui/icons-material/Add'
+import FlagIcon from '@mui/icons-material/Flag'
+import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined'
 import {
   fetchAllSessions, revokeSession, deleteRevokedSessions, fetchAllUsers, fetchTodos, fetchArchivedTodos,
   saveTodo, deleteTodo, deleteUserAccount,
@@ -22,7 +24,7 @@ import type { Session, UserRecord } from '../services/firebase'
 import type { Todo } from '../types'
 import {
   fetchHubs, createHub, deleteHub,
-  fetchHubTasks, addHubTask, completeHubTask, uncompleteHubTask, renameHubTask, deleteHubTask,
+  fetchHubTasks, addHubTask, completeHubTask, uncompleteHubTask, renameHubTask, deleteHubTask, setPriorityHubTask,
 } from '../services/hubService'
 import type { Hub, HubTask } from '../services/hubService'
 import { useAuthStore } from '../store/authStore'
@@ -490,9 +492,10 @@ interface AdminTaskRowProps {
   onComplete: () => void
   onRename: (text: string) => Promise<void>
   onDelete: () => void
+  onSetPriority?: (priority: boolean) => void
 }
 
-function AdminTaskRow({ task, completed, onComplete, onRename, onDelete }: AdminTaskRowProps) {
+function AdminTaskRow({ task, completed, onComplete, onRename, onDelete, onSetPriority }: AdminTaskRowProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(task.text)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -520,8 +523,8 @@ function AdminTaskRow({ task, completed, onComplete, onRename, onDelete }: Admin
     <Box sx={{
       display: 'flex', alignItems: 'center', gap: 1, px: 1.5,
       py: completed ? 0.6 : 0.75, borderRadius: '6px', mb: 0.5,
-      bgcolor: completed ? '#052e16' : '#0d1117',
-      border: completed ? '1px solid #166534' : '1px solid #1f2937',
+      bgcolor: completed ? '#052e16' : task.priority ? '#1c0a00' : '#0d1117',
+      border: completed ? '1px solid #166534' : task.priority ? '1px solid #92400e' : '1px solid #1f2937',
       opacity: completed ? 0.85 : 1,
     }}>
       <Tooltip title={completed ? 'Mark incomplete' : 'Mark complete'}>
@@ -547,10 +550,11 @@ function AdminTaskRow({ task, completed, onComplete, onRename, onDelete }: Admin
         <Tooltip title={completed ? '' : 'Double-click to rename'} placement="top" enterDelay={800}>
           <Typography onDoubleClick={startEdit} sx={{
             flex: 1, fontSize: 12,
-            color: completed ? '#86efac' : '#e5e7eb',
+            color: completed ? '#86efac' : task.priority ? '#fcd34d' : '#e5e7eb',
             textDecoration: completed ? 'line-through' : 'none',
             cursor: completed ? 'default' : 'text',
             userSelect: 'none',
+            fontWeight: task.priority && !completed ? 500 : 400,
           }}>
             {task.text}
           </Typography>
@@ -561,6 +565,15 @@ function AdminTaskRow({ task, completed, onComplete, onRename, onDelete }: Admin
         <Typography sx={{ fontSize: 10, color: '#4ade80', whiteSpace: 'nowrap', mr: 0.5 }}>
           {new Date(task.completedAt!).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
         </Typography>
+      )}
+
+      {!completed && onSetPriority && (
+        <Tooltip title={task.priority ? 'Remove priority' : 'Mark high priority'}>
+          <IconButton size="small" onClick={() => onSetPriority(!task.priority)}
+            sx={{ color: task.priority ? '#f59e0b' : '#374151', '&:hover': { color: '#f59e0b' }, p: '3px', flexShrink: 0 }}>
+            {task.priority ? <FlagIcon sx={{ fontSize: 14 }} /> : <FlagOutlinedIcon sx={{ fontSize: 14 }} />}
+          </IconButton>
+        </Tooltip>
       )}
 
       <Tooltip title="Delete">
@@ -655,6 +668,12 @@ function AdminHubsTab() {
     if (!selectedUid) return
     await renameHubTask(selectedUid, task.id, text)
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, text } : t))
+  }
+
+  async function handleSetPriority(task: HubTask, priority: boolean) {
+    if (!selectedUid) return
+    await setPriorityHubTask(selectedUid, task.id, priority)
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, priority } : t))
   }
 
   async function handleDeleteTask(task: HubTask) {
@@ -810,6 +829,7 @@ function AdminHubsTab() {
                           task={task}
                           onComplete={() => handleComplete(task)}
                           onRename={text => handleRename(task, text)}
+                          onSetPriority={p => handleSetPriority(task, p)}
                           onDelete={() => handleDeleteTask(task)}
                         />
                       ))}

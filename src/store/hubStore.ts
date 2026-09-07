@@ -3,7 +3,7 @@ import { auth } from '../services/firebase'
 import type { Hub, HubTask } from '../services/hubService'
 import {
   fetchHubs, createHub, deleteHub,
-  fetchHubTasks, addHubTask, completeHubTask, uncompleteHubTask, renameHubTask, deleteHubTask,
+  fetchHubTasks, addHubTask, completeHubTask, uncompleteHubTask, renameHubTask, deleteHubTask, setPriorityHubTask,
 } from '../services/hubService'
 
 function uid() {
@@ -26,6 +26,7 @@ interface HubStore {
   completeTask: (hubId: string, taskId: string) => Promise<void>
   uncompleteTask: (hubId: string, taskId: string) => Promise<void>
   renameTask: (hubId: string, taskId: string, text: string) => Promise<void>
+  setPriority: (hubId: string, taskId: string, priority: boolean) => Promise<void>
   removeTask: (hubId: string, taskId: string) => Promise<void>
 }
 
@@ -104,6 +105,18 @@ export const useHubStore = create<HubStore>((set, get) => ({
         ...s.tasks,
         [hubId]: (s.tasks[hubId] ?? []).map((t: HubTask) =>
           t.id === taskId ? { ...t, text } : t
+        ),
+      },
+    }))
+  },
+
+  setPriority: async (hubId: string, taskId: string, priority: boolean) => {
+    await setPriorityHubTask(uid(), taskId, priority)
+    set((s: HubStore) => ({
+      tasks: {
+        ...s.tasks,
+        [hubId]: (s.tasks[hubId] ?? []).map((t: HubTask) =>
+          t.id === taskId ? { ...t, priority } : t
         ),
       },
     }))
