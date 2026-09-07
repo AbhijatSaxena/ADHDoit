@@ -11,6 +11,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import AddIcon from '@mui/icons-material/Add'
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined'
 import FormatListNumberedOutlinedIcon from '@mui/icons-material/FormatListNumberedOutlined'
+import FlagIcon from '@mui/icons-material/Flag'
 import { useTodoStore } from '../store/todoStore'
 import type { Todo } from '../types'
 import type { TodoAction } from '../services/ai'
@@ -27,6 +28,7 @@ export default function TodosPage() {
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [showPriority, setShowPriority] = useState(false)
   const [newText, setNewText] = useState('')
   const [adding, setAdding] = useState(false)
   const [view, setView] = useState<'tree' | 'priority'>('tree')
@@ -84,6 +86,7 @@ export default function TodosPage() {
   useEffect(() => { load() }, [])
 
   const completedHidden = todos.filter(t => t.done)
+  const priorityTodos  = todos.filter(t => !t.done && t.priority)
   const graphTodos = todos.filter(t => !t.done)
   const readyTodos = todos.filter(t => !t.done && getPendingBlockers(t, todos).length === 0)
 
@@ -180,6 +183,17 @@ export default function TodosPage() {
       </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mb: 1.5 }}>
+        {priorityTodos.length > 0 && (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<FlagIcon sx={{ fontSize: 14, color: '#f59e0b' }} />}
+            onClick={() => setShowPriority(true)}
+            sx={{ fontSize: 11, textTransform: 'none', color: '#f59e0b', borderColor: '#92400e', '&:hover': { bgcolor: 'rgba(146,64,14,0.1)', borderColor: '#b45309' } }}
+          >
+            Priority ({priorityTodos.length})
+          </Button>
+        )}
         <Button
           size="small"
           variant="outlined"
@@ -255,6 +269,46 @@ export default function TodosPage() {
           paused={paused}
         />
       )}
+
+      {/* High priority todos dialog */}
+      <Dialog open={showPriority} onClose={() => setShowPriority(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <FlagIcon sx={{ color: '#f59e0b', fontSize: 18 }} /> High Priority
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {priorityTodos.length === 0 && (
+            <Typography variant="body2" color="text.disabled" sx={{ textAlign: 'center', py: 4 }}>
+              No high-priority todos.
+            </Typography>
+          )}
+          <List disablePadding>
+            {priorityTodos.map(t => (
+              <ListItem
+                key={t.id}
+                divider
+                onClick={() => { handleSelect(t); setShowPriority(false) }}
+                sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(146,64,14,0.1)' }, borderLeft: '3px solid #f59e0b' }}
+                secondaryAction={
+                  <Tooltip title="Remove priority">
+                    <IconButton size="small" onClick={e => { e.stopPropagation(); update({ ...t, priority: false }) }} sx={{ color: '#f59e0b', '&:hover': { color: 'text.secondary' } }}>
+                      <FlagIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                }
+              >
+                <ListItemText
+                  primary={t.text}
+                  secondary={getPendingBlockers(t, todos).length > 0 ? `🔒 Blocked by ${getPendingBlockers(t, todos).length}` : '● Ready'}
+                  slotProps={{
+                    primary: { style: { fontSize: 13, color: '#fcd34d' } },
+                    secondary: { style: { fontSize: 11, color: getPendingBlockers(t, todos).length > 0 ? '#f87171' : '#4ade80' } },
+                  }}
+                />
+              </ListItem>
+            ))}
+          </List>
+        </DialogContent>
+      </Dialog>
 
       {/* Completed todos dialog */}
       <Dialog open={showCompleted} onClose={() => setShowCompleted(false)} maxWidth="sm" fullWidth>

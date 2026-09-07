@@ -9,6 +9,8 @@ import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import AdjustOutlinedIcon from '@mui/icons-material/AdjustOutlined'
 import PauseCircleOutlinedIcon from '@mui/icons-material/PauseCircleOutlined'
+import FlagIcon from '@mui/icons-material/Flag'
+import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined'
 import SendIcon from '@mui/icons-material/Send'
 import AddIcon from '@mui/icons-material/Add'
 import type { Todo } from '../types'
@@ -200,7 +202,7 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
           </IconButton>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
           <Button
             size="small"
             variant={todo.done ? 'outlined' : 'contained'}
@@ -232,6 +234,24 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
             Delete
           </Button>
         </Box>
+
+        {!todo.done && (
+          <Button
+            fullWidth size="small"
+            variant={todo.priority ? 'contained' : 'outlined'}
+            startIcon={todo.priority ? <FlagIcon sx={{ fontSize: 14 }} /> : <FlagOutlinedIcon sx={{ fontSize: 14 }} />}
+            onClick={() => updateTodo({ ...todo, priority: !todo.priority })}
+            sx={{
+              mb: 1.5, fontSize: 11, py: 0.5, textTransform: 'none',
+              bgcolor: todo.priority ? '#92400e' : 'transparent',
+              borderColor: '#92400e',
+              color: todo.priority ? '#fef3c7' : '#f59e0b',
+              '&:hover': { bgcolor: todo.priority ? '#78350f' : 'rgba(146,64,14,0.12)', borderColor: '#92400e' },
+            }}
+          >
+            {todo.priority ? 'High priority — click to remove' : 'Mark as high priority'}
+          </Button>
+        )}
 
         {canFocus && !isFocused && (
           <Button

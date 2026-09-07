@@ -7,6 +7,7 @@ export interface Todo {
   commentCount?: number
   dependsOn?: string[]  // IDs of todos that must be completed first
   focusMs?: number      // total ms spent in focus across all sessions
+  priority?: boolean
 }
 
 export interface TodoComment {

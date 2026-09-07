@@ -158,6 +158,9 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
     : status === 'blocked'
     ? { boxShadow: '0 0 10px rgba(248,113,113,0.12)' }
     : {}
+  const priorityRing = todo.priority && status !== 'done'
+    ? { outline: '1.5px solid #92400e', outlineOffset: '1px' }
+    : {}
 
   const dropRing = isDropTarget
     ? { outline: '2px solid #60a5fa', outlineOffset: '2px', boxShadow: '0 0 18px rgba(96,165,250,0.4)' }
@@ -192,6 +195,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
         p: '7px 9px',
         transition: 'box-shadow 0.15s, border-color 0.15s, outline 0.1s',
         ...glowStyle,
+        ...priorityRing,
         ...dropRing,
         '&:hover': anyDrag ? {} : {
           boxShadow: status === 'available'
@@ -266,6 +270,9 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
               <CommentOutlinedIcon sx={{ fontSize: 9 }} />
               <Typography sx={{ fontSize: 9, lineHeight: 1, fontWeight: 600 }}>{todo.commentCount}</Typography>
             </Box>
+          )}
+          {todo.priority && (
+            <Typography sx={{ fontSize: 10, lineHeight: 1, color: '#f59e0b' }} title="High priority">🚩</Typography>
           )}
           {hovered && !todo.done && !anyDrag && (
             <Tooltip title="Add a new blocker" placement="bottom" arrow>
