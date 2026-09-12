@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState, useEffect } from 'react'
+import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { Box, InputBase, Paper, Typography, Tooltip } from '@mui/material'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import CommentOutlinedIcon from '@mui/icons-material/CommentOutlined'
 import * as dagre from '@dagrejs/dagre'
 import type { Todo } from '../types'
-import { getPendingBlockers } from '../utils/todoUtils'
+import { getPendingBlockersByMap, indexTodos, wouldCreateCycle } from '../utils/todoUtils'
+import { statusColors } from '../theme/statusColors'
 
 const NODE_W = 165
 const NODE_H = 68
@@ -24,22 +25,8 @@ interface Edge {
   points: { x1: number; y1: number; x2: number; y2: number }
 }
 
-function wouldCreateCycle(todos: Todo[], blockerId: string, blockedId: string): boolean {
-  if (blockerId === blockedId) return true
-  const visited = new Set<string>()
-  const stack = [blockerId]
-  while (stack.length) {
-    const id = stack.pop()!
-    if (id === blockedId) return true
-    if (visited.has(id)) continue
-    visited.add(id)
-    const todo = todos.find(t => t.id === id)
-    if (todo) (todo.dependsOn ?? []).forEach(d => stack.push(d))
-  }
-  return false
-}
-
 function buildLayout(todos: Todo[]): { nodes: LayoutNode[]; edges: Edge[]; width: number; height: number } {
+  const byId = indexTodos(todos)
   const activeTodos = todos.filter(t => !t.done)
   const doneTodos   = todos.filter(t => t.done)
 
@@ -82,7 +69,7 @@ function buildLayout(todos: Todo[]): { nodes: LayoutNode[]; edges: Edge[]; width
 
   const dagreNodes: LayoutNode[] = dagreTodos.map(t => {
     const pos = g.node(t.id)
-    const pending = getPendingBlockers(t, todos)
+    const pending = getPendingBlockersByMap(t, byId)
     return { todo: t, x: pos.x - NODE_W / 2, y: pos.y - NODE_H / 2, blocked: pending.length > 0, pendingDepsCount: pending.length }
   })
 
@@ -132,24 +119,25 @@ interface NodeCardProps {
   onClick: (todo: Todo) => void
   focused: boolean
   paused: boolean
-  onConnectStart: (e: React.MouseEvent, side: 'top' | 'bottom') => void
+  onConnectStart: (e: React.MouseEvent, node: LayoutNode, side: 'top' | 'bottom') => void
   isDropTarget: boolean
   isDragSource: boolean
   anyDrag: boolean
   onAddBlockerRequest: (todoId: string) => void
 }
 
-function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget, isDragSource, anyDrag, onAddBlockerRequest }: NodeCardProps) {
+const NodeCard = memo(function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget, isDragSource, anyDrag, onAddBlockerRequest }: NodeCardProps) {
   const [hovered, setHovered] = useState(false)
   const { todo, x, y, blocked, pendingDepsCount } = node
   const status = todo.done ? 'done' : focused ? (paused ? 'paused' : 'focused') : blocked ? 'blocked' : 'available'
 
-  const accentColor = status === 'done' ? '#4b5563' : status === 'focused' ? '#f59e0b' : status === 'paused' ? '#f97316' : status === 'blocked' ? '#f87171' : '#22c55e'
-  const borderColor = status === 'done' ? '#374151' : status === 'focused' ? '#b45309' : status === 'paused' ? '#9a3412' : status === 'blocked' ? '#7f1d1d' : '#166534'
-  const bgColor     = status === 'done' ? '#161b24' : status === 'focused' ? '#1c0a00' : status === 'paused' ? '#1c0a00' : status === 'blocked' ? '#1c0a0a' : '#052e16'
-  const textColor   = status === 'done' ? '#9ca3af' : status === 'focused' ? '#fef3c7' : status === 'paused' ? '#fed7aa' : status === 'blocked' ? '#e5e7eb' : '#d1fae5'
-  const statusColor = status === 'done' ? '#9ca3af' : status === 'focused' ? '#fbbf24' : status === 'paused' ? '#fb923c' : status === 'blocked' ? '#fca5a5' : '#4ade80'
-  const statusLabel = status === 'done' ? '✓ Done' : status === 'focused' ? '⏱ Focused' : status === 'paused' ? '⏸ Paused' : status === 'blocked' ? '🔒 Blocked' : '● Ready'
+  const palette = statusColors[status]
+  const accentColor = palette.accent
+  const borderColor = palette.border
+  const bgColor     = palette.bg
+  const textColor   = palette.text
+  const statusColor = palette.status
+  const statusLabel = palette.label
 
   const glowStyle = status === 'available'
     ? { boxShadow: '0 0 16px rgba(34,197,94,0.22), 0 0 0 1px rgba(34,197,94,0.18)' }
@@ -211,7 +199,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
       {showHandle && (['top', 'bottom'] as const).map(side => (
         <Tooltip key={side} title="Drag to create dependency" placement={side} arrow>
           <Box
-            onMouseDown={e => { e.stopPropagation(); onConnectStart(e, side) }}
+            onMouseDown={e => { e.stopPropagation(); onConnectStart(e, node, side) }}
             sx={{
               position: 'absolute',
               ...(side === 'top' ? { top: -8 } : { bottom: -8 }),
@@ -300,7 +288,7 @@ function NodeCard({ node, onClick, focused, paused, onConnectStart, isDropTarget
       </Box>
     </Paper>
   )
-}
+})
 
 interface DragState {
   fromId: string
@@ -351,7 +339,7 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
     return { x: e.clientX - rect.left, y: e.clientY - rect.top }
   }
 
-  function handleConnectStart(e: React.MouseEvent, node: LayoutNode, side: 'top' | 'bottom') {
+  const handleConnectStart = useCallback((e: React.MouseEvent, node: LayoutNode, side: 'top' | 'bottom') => {
     e.preventDefault()
     const { x, y } = toCanvas(e)
     setDrag({
@@ -362,7 +350,14 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
       curY: y,
     })
     setDropTarget(null)
-  }
+  }, [])
+
+  const requestAddBlocker = useCallback((id: string) => {
+    setPendingConnect(null)
+    setPendingDisconnect(null)
+    setAddingBlockerFor(id)
+    setNewBlockerText('')
+  }, [])
 
   function handleMouseMove(e: React.MouseEvent) {
     if (!drag) return
@@ -379,7 +374,7 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
   function finishDrag() {
     if (drag && dropTarget) {
       const alreadyLinked = todos.find(t => t.id === dropTarget)?.dependsOn?.includes(drag.fromId)
-      if (!alreadyLinked && !wouldCreateCycle(todos, drag.fromId, dropTarget)) {
+      if (!alreadyLinked && !wouldCreateCycle(todos, dropTarget, drag.fromId)) {
         setPendingConnect({ blockerId: drag.fromId, blockedId: dropTarget })
       }
     }
@@ -645,11 +640,11 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
                 onClick={onSelect}
                 focused={node.todo.id === focusedId}
                 paused={paused}
-                onConnectStart={(e, side) => handleConnectStart(e, node, side)}
+                onConnectStart={handleConnectStart}
                 isDropTarget={dropTarget === node.todo.id}
                 isDragSource={drag?.fromId === node.todo.id}
                 anyDrag={!!drag}
-                onAddBlockerRequest={id => { setPendingConnect(null); setPendingDisconnect(null); setAddingBlockerFor(id); setNewBlockerText('') }}
+                onAddBlockerRequest={requestAddBlocker}
               />
             ))}
           </div>

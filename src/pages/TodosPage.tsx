@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Box, CircularProgress, Button, Dialog, DialogTitle, DialogContent,
   List, ListItem, ListItemText, IconButton, Typography, Tooltip,
@@ -20,7 +20,7 @@ import TodoDetailPanel from '../components/TodoDetailPanel'
 import TodoAiChat from '../components/TodoAiChat'
 import MobileTodoList from '../components/MobileTodoList'
 import { useTodoFocus } from '../hooks/useTodoFocus'
-import { getPendingBlockers } from '../utils/todoUtils'
+import { getPendingBlockersByMap, indexTodos } from '../utils/todoUtils'
 
 export default function TodosPage() {
   const isMobile = useMediaQuery('(max-width: 767px)')
@@ -85,10 +85,16 @@ export default function TodosPage() {
 
   useEffect(() => { load() }, [])
 
+  const byId = useMemo(() => indexTodos(todos), [todos])
   const completedHidden = todos.filter(t => t.done)
   const priorityTodos  = todos.filter(t => !t.done && t.priority)
   const graphTodos = todos.filter(t => !t.done)
-  const readyTodos = todos.filter(t => !t.done && getPendingBlockers(t, todos).length === 0)
+  const readyTodos = todos.filter(t => !t.done && getPendingBlockersByMap(t, byId).length === 0)
+  // Precompute pending-blocker counts for priority rows (avoids 3× recompute per row in JSX)
+  const priorityBlockerCount = useMemo(
+    () => new Map(priorityTodos.map(t => [t.id, getPendingBlockersByMap(t, byId).length])),
+    [priorityTodos, byId],
+  )
 
   async function handleDepsChange(todo: Todo, deps: string[]) {
     const updated = { ...todo, dependsOn: deps }
@@ -240,12 +246,16 @@ export default function TodosPage() {
             readyTodos.map((todo, i) => (
               <Box
                 key={todo.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSelect(todo)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(todo) } }}
                 sx={{
                   display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 1.25, px: 1.5,
                   mb: 0.75, borderRadius: '8px', cursor: 'pointer',
                   bgcolor: '#052e16', border: '1px solid #166534', borderLeft: '3px solid #22c55e',
                   '&:hover': { bgcolor: '#064a23' },
+                  '&:focus-visible': { outline: '2px solid #22c55e', outlineOffset: 2 },
                 }}
               >
                 <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#4ade80', minWidth: 22, mt: '1px' }}>
@@ -282,7 +292,9 @@ export default function TodosPage() {
             </Typography>
           )}
           <List disablePadding>
-            {priorityTodos.map(t => (
+            {priorityTodos.map(t => {
+              const blockerCount = priorityBlockerCount.get(t.id) ?? 0
+              return (
               <ListItem
                 key={t.id}
                 divider
@@ -298,14 +310,15 @@ export default function TodosPage() {
               >
                 <ListItemText
                   primary={t.text}
-                  secondary={getPendingBlockers(t, todos).length > 0 ? `🔒 Blocked by ${getPendingBlockers(t, todos).length}` : '● Ready'}
+                  secondary={blockerCount > 0 ? `🔒 Blocked by ${blockerCount}` : '● Ready'}
                   slotProps={{
                     primary: { style: { fontSize: 13, color: '#fcd34d' } },
-                    secondary: { style: { fontSize: 11, color: getPendingBlockers(t, todos).length > 0 ? '#f87171' : '#4ade80' } },
+                    secondary: { style: { fontSize: 11, color: blockerCount > 0 ? '#f87171' : '#4ade80' } },
                   }}
                 />
               </ListItem>
-            ))}
+              )
+            })}
           </List>
         </DialogContent>
       </Dialog>

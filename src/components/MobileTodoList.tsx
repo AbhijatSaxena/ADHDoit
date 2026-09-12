@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Box, Typography, Paper, Drawer, Button,
   TextField, IconButton, Divider, CircularProgress,
@@ -13,7 +13,8 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 import type { Todo } from '../types'
 import { useTodoStore } from '../store/todoStore'
-import { getPendingBlockers } from '../utils/todoUtils'
+import { getPendingBlockersByMap, indexTodos } from '../utils/todoUtils'
+import { statusColors } from '../theme/statusColors'
 import { confirm } from './ConfirmDialog'
 
 interface Props {
@@ -30,16 +31,17 @@ export default function MobileTodoList({ todos }: Props) {
   const [newBlockerText, setNewBlockerText] = useState('')
   const [addingBlocker, setAddingBlocker]   = useState(false)
 
+  const byId = useMemo(() => indexTodos(todos), [todos])
   const activeTodos  = todos.filter(t => !t.done)
-  const readyTodos   = activeTodos.filter(t => getPendingBlockers(t, todos).length === 0)
-  const blockedTodos = activeTodos.filter(t => getPendingBlockers(t, todos).length > 0)
+  const readyTodos   = activeTodos.filter(t => getPendingBlockersByMap(t, byId).length === 0)
+  const blockedTodos = activeTodos.filter(t => getPendingBlockersByMap(t, byId).length > 0)
   const doneTodos    = todos.filter(t => t.done)
 
   // Always read selected from latest store state
-  const selectedFresh   = selected ? (todos.find(t => t.id === selected.id) ?? null) : null
-  const selectedBlockerIds = selectedFresh ? getPendingBlockers(selectedFresh, todos) : []
+  const selectedFresh   = selected ? (byId.get(selected.id) ?? null) : null
+  const selectedBlockerIds = selectedFresh ? getPendingBlockersByMap(selectedFresh, byId) : []
   const selectedBlockers   = selectedBlockerIds
-    .map(id => todos.find(t => t.id === id))
+    .map(id => byId.get(id))
     .filter((t): t is Todo => !!t)
 
   async function handleAdd() {
@@ -87,12 +89,13 @@ export default function MobileTodoList({ todos }: Props) {
   }
 
   function TodoCard({ todo }: { todo: Todo }) {
-    const blockers  = getPendingBlockers(todo, todos)
+    const blockers  = getPendingBlockersByMap(todo, byId)
     const isBlocked = blockers.length > 0
-    const accent    = isBlocked ? '#f87171' : '#22c55e'
-    const bg        = isBlocked ? '#1c0a0a' : '#052e16'
-    const border    = isBlocked ? '#7f1d1d' : '#166534'
-    const text      = isBlocked ? '#e5e7eb' : '#d1fae5'
+    const palette   = isBlocked ? statusColors.blocked : statusColors.available
+    const accent    = palette.accent
+    const bg        = palette.bg
+    const border    = palette.border
+    const text      = palette.text
 
     return (
       <Paper

@@ -1,12 +1,30 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
-import Layout from './components/Layout'
+import { Box, CircularProgress } from '@mui/material'
 import RequireAuth from './components/RequireAuth'
+
+// Eager: tiny, needed for first paint on the auth flow
 import LoginPage from './pages/LoginPage'
 import SignUpPage from './pages/SignUpPage'
-import TodosPage from './pages/TodosPage'
-import AdminPage from './pages/AdminPage'
-import TaskHubPage from './pages/TaskHubPage'
-import HubDetailPage from './pages/HubDetailPage'
+
+// Lazy: split large/route-specific bundles out of the initial download
+const Layout        = lazy(() => import('./components/Layout'))
+const TodosPage     = lazy(() => import('./pages/TodosPage'))
+const AdminPage     = lazy(() => import('./pages/AdminPage'))
+const TaskHubPage   = lazy(() => import('./pages/TaskHubPage'))
+const HubDetailPage = lazy(() => import('./pages/HubDetailPage'))
+
+function PageFallback() {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+      <CircularProgress size={28} />
+    </Box>
+  )
+}
+
+function lazyRoute(node: React.ReactNode) {
+  return <Suspense fallback={<PageFallback />}>{node}</Suspense>
+}
 
 export const router = createBrowserRouter([
   { path: '/login',  element: <LoginPage /> },
@@ -17,13 +35,13 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        element: <Layout />,
+        element: lazyRoute(<Layout />),
         children: [
           { index: true, element: <Navigate to="/todos" replace /> },
-          { path: 'todos', element: <TodosPage /> },
-          { path: 'hub', element: <TaskHubPage /> },
-          { path: 'hub/:hubId', element: <HubDetailPage /> },
-          { path: 'admin', element: <AdminPage /> },
+          { path: 'todos', element: lazyRoute(<TodosPage />) },
+          { path: 'hub', element: lazyRoute(<TaskHubPage />) },
+          { path: 'hub/:hubId', element: lazyRoute(<HubDetailPage />) },
+          { path: 'admin', element: lazyRoute(<AdminPage />) },
         ],
       },
     ],

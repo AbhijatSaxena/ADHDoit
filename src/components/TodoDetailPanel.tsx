@@ -14,7 +14,7 @@ import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined'
 import SendIcon from '@mui/icons-material/Send'
 import AddIcon from '@mui/icons-material/Add'
 import type { Todo } from '../types'
-import { isTodoBlocked } from '../utils/todoUtils'
+import { isTodoBlocked, wouldCreateCycle } from '../utils/todoUtils'
 import { fmtMs } from '../lib/fmt'
 import { useCommentStore } from '../store/commentStore'
 import { useTodoStore } from '../store/todoStore'
@@ -35,17 +35,6 @@ interface Props {
 }
 
 type TabId = 0 | 1
-
-function wouldCreateCycle(todos: Todo[], targetId: string, newDepId: string): boolean {
-  const visited = new Set<string>()
-  function reaches(id: string): boolean {
-    if (id === targetId) return true
-    if (visited.has(id)) return false
-    visited.add(id)
-    return (todos.find(t => t.id === id)?.dependsOn ?? []).some(reaches)
-  }
-  return reaches(newDepId)
-}
 
 export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, focusedId, paused, accMs, onFocus, onPause, onResume, onUnfocus }: Props) {
   const [tab, setTab] = useState<TabId>(0)
