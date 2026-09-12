@@ -11,8 +11,6 @@ import SignUpPage from './pages/SignUpPage'
 const Layout        = lazy(() => import('./components/Layout'))
 const TodosPage     = lazy(() => import('./pages/TodosPage'))
 const AdminPage     = lazy(() => import('./pages/AdminPage'))
-const TaskHubPage   = lazy(() => import('./pages/TaskHubPage'))
-const HubDetailPage = lazy(() => import('./pages/HubDetailPage'))
 
 function PageFallback() {
   return (
@@ -39,8 +37,6 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/todos" replace /> },
           { path: 'todos', element: lazyRoute(<TodosPage />) },
-          { path: 'hub', element: lazyRoute(<TaskHubPage />) },
-          { path: 'hub/:hubId', element: lazyRoute(<HubDetailPage />) },
           { path: 'admin', element: lazyRoute(<AdminPage />) },
         ],
       },
