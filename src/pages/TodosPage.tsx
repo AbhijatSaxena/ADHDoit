@@ -21,6 +21,7 @@ import TodoAiChat from '../components/TodoAiChat'
 import MobileTodoList from '../components/MobileTodoList'
 import { useTodoFocus } from '../hooks/useTodoFocus'
 import { getPendingBlockersByMap, indexTodos } from '../utils/todoUtils'
+import { confirm } from '../components/ConfirmDialog'
 
 export default function TodosPage() {
   const isMobile = useMediaQuery('(max-width: 767px)')
@@ -64,7 +65,7 @@ export default function TodosPage() {
         const resolvedDepId  = tempMap[action.dependsOnId]?.id ?? action.dependsOnId
         const todo = tempMap[action.todoId] ?? todos.find(t => t.id === resolvedTodoId)
         if (todo) {
-          const updated = { ...todo, dependsOn: [...new Set([...(todo.dependsOn ?? []), resolvedDepId])] }
+          const updated = { ...todo, dependsOn: [resolvedDepId] }
           await update(updated)
           if (action.todoId in tempMap) tempMap[action.todoId] = updated
         }
@@ -107,7 +108,19 @@ export default function TodosPage() {
   async function handleConnect(blockerId: string, blockedId: string) {
     const todo = todos.find(t => t.id === blockedId)
     if (!todo) return
-    const updated = { ...todo, dependsOn: [...new Set([...(todo.dependsOn ?? []), blockerId])] }
+    const existingDeps = (todo.dependsOn ?? []).filter(id => id !== blockerId)
+    if (existingDeps.length > 0) {
+      const oldParent = todos.find(t => t.id === existingDeps[0])
+      const newParent = todos.find(t => t.id === blockerId)
+      const ok = await confirm({
+        title: 'Replace parent?',
+        message: `"${todo.text}" is already blocked by "${oldParent?.text ?? 'unknown'}". Replace with "${newParent?.text ?? 'unknown'}"?`,
+        confirmLabel: 'Replace',
+        danger: false,
+      })
+      if (!ok) return
+    }
+    const updated = { ...todo, dependsOn: [blockerId] }
     await update(updated)
     if (selectedTodo?.id === blockedId) setSelectedTodo(updated)
   }
@@ -124,7 +137,7 @@ export default function TodosPage() {
     const newTodo = await add(text)
     const parent = todos.find(t => t.id === parentId)
     if (parent) {
-      const updated = { ...parent, dependsOn: [...new Set([...(parent.dependsOn ?? []), newTodo.id])] }
+      const updated = { ...parent, dependsOn: [newTodo.id] }
       await update(updated)
       if (selectedTodo?.id === parentId) setSelectedTodo(updated)
     }

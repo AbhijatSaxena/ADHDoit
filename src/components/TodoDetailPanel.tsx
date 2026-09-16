@@ -97,7 +97,7 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
     const text = newBlockerText.trim()
     if (!text) return
     const newTodo = await addTodo(text)
-    onDepsChange(todo, [...(todo.dependsOn ?? []), newTodo.id])
+    onDepsChange(todo, [newTodo.id])
     setNewBlockerText('')
   }
 
@@ -105,11 +105,12 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
     const current = new Set(todo.dependsOn ?? [])
     if (current.has(depId)) {
       current.delete(depId)
+      onDepsChange(todo, Array.from(current))
     } else {
       if (wouldCreateCycle(todos, todo.id, depId)) return
-      current.add(depId)
+      // Single parent: replace any existing dep
+      onDepsChange(todo, [depId])
     }
-    onDepsChange(todo, Array.from(current))
   }
 
   const activeDeps = (todo.dependsOn ?? [])
