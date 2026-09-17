@@ -37,6 +37,16 @@ export function isTodoBlockedByMap(todo: Todo, byId: Map<string, Todo>): boolean
 }
 
 /**
+ * Returns the todo(s) that currently list `childId` in their dependsOn —
+ * i.e. the parent(s) `childId` is blocking. By convention a child should
+ * only ever have one parent; this returns all matches defensively in case
+ * data ever drifts, so callers can decide how to handle it.
+ */
+export function findParentsOf(childId: string, todos: Todo[]): Todo[] {
+  return todos.filter(t => (t.dependsOn ?? []).includes(childId))
+}
+
+/**
  * True if linking `newDepId` as a blocker of `targetId` would form a cycle.
  * (i.e. targetId is already reachable by following dependsOn edges from newDepId.)
  * Single shared implementation — used by TodoGraph and TodoDetailPanel.

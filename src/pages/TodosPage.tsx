@@ -20,7 +20,8 @@ import TodoDetailPanel from '../components/TodoDetailPanel'
 import TodoAiChat from '../components/TodoAiChat'
 import MobileTodoList from '../components/MobileTodoList'
 import { useTodoFocus } from '../hooks/useTodoFocus'
-import { getPendingBlockersByMap, indexTodos } from '../utils/todoUtils'
+import { getPendingBlockersByMap, indexTodos, findParentsOf } from '../utils/todoUtils'
+import { confirm } from '../components/ConfirmDialog'
 
 export default function TodosPage() {
   const isMobile = useMediaQuery('(max-width: 767px)')
@@ -64,6 +65,11 @@ export default function TodosPage() {
         const resolvedDepId  = tempMap[action.dependsOnId]?.id ?? action.dependsOnId
         const todo = tempMap[action.todoId] ?? todos.find(t => t.id === resolvedTodoId)
         if (todo) {
+          // Enforce single-parent: unlink the dep from any other parent first
+          const oldParents = findParentsOf(resolvedDepId, todos).filter(p => p.id !== todo.id)
+          for (const oldParent of oldParents) {
+            await update({ ...oldParent, dependsOn: (oldParent.dependsOn ?? []).filter(d => d !== resolvedDepId) })
+          }
           const updated = { ...todo, dependsOn: [...new Set([...(todo.dependsOn ?? []), resolvedDepId])] }
           await update(updated)
           if (action.todoId in tempMap) tempMap[action.todoId] = updated
@@ -105,9 +111,29 @@ export default function TodosPage() {
   const handleSelect = useCallback((todo: Todo) => setSelectedTodo(todo), [])
 
   async function handleConnect(blockerId: string, blockedId: string) {
-    const todo = todos.find(t => t.id === blockedId)
-    if (!todo) return
-    const updated = { ...todo, dependsOn: [...new Set([...(todo.dependsOn ?? []), blockerId])] }
+    const newParent = todos.find(t => t.id === blockedId)
+    const child = todos.find(t => t.id === blockerId)
+    if (!newParent || !child) return
+
+    // A child belongs to exactly one parent. If it already has a different
+    // parent, confirm and MOVE it: unlink from the old parent, link to the new
+    // one — the old parent keeps any other children it has.
+    const oldParents = findParentsOf(blockerId, todos).filter(p => p.id !== blockedId)
+    if (oldParents.length > 0) {
+      const oldParent = oldParents[0]
+      const ok = await confirm({
+        title: 'Move blocker?',
+        message: `"${child.text}" is currently blocking "${oldParent.text}". Move it to block "${newParent.text}" instead?`,
+        confirmLabel: 'Move',
+        danger: false,
+      })
+      if (!ok) return
+      const updatedOldParent = { ...oldParent, dependsOn: (oldParent.dependsOn ?? []).filter(d => d !== blockerId) }
+      await update(updatedOldParent)
+      if (selectedTodo?.id === oldParent.id) setSelectedTodo(updatedOldParent)
+    }
+
+    const updated = { ...newParent, dependsOn: [...new Set([...(newParent.dependsOn ?? []), blockerId])] }
     await update(updated)
     if (selectedTodo?.id === blockedId) setSelectedTodo(updated)
   }

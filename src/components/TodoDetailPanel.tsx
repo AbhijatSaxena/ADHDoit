@@ -14,7 +14,7 @@ import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined'
 import SendIcon from '@mui/icons-material/Send'
 import AddIcon from '@mui/icons-material/Add'
 import type { Todo } from '../types'
-import { isTodoBlocked, wouldCreateCycle } from '../utils/todoUtils'
+import { isTodoBlocked, wouldCreateCycle, findParentsOf } from '../utils/todoUtils'
 import { fmtMs } from '../lib/fmt'
 import { useCommentStore } from '../store/commentStore'
 import { useTodoStore } from '../store/todoStore'
@@ -101,14 +101,33 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
     setNewBlockerText('')
   }
 
-  function toggleDep(depId: string) {
+  function unlinkDep(depId: string) {
     const current = new Set(todo.dependsOn ?? [])
-    if (current.has(depId)) {
-      current.delete(depId)
-    } else {
-      if (wouldCreateCycle(todos, todo.id, depId)) return
-      current.add(depId)
+    current.delete(depId)
+    onDepsChange(todo, Array.from(current))
+  }
+
+  async function linkDep(depId: string) {
+    if (wouldCreateCycle(todos, todo.id, depId)) return
+
+    // A child belongs to exactly one parent — if it already blocks a
+    // different todo, confirm and move it rather than letting it block both.
+    const oldParents = findParentsOf(depId, todos).filter(p => p.id !== todo.id)
+    if (oldParents.length > 0) {
+      const oldParent = oldParents[0]
+      const child = todos.find(t => t.id === depId)
+      const ok = await confirm({
+        title: 'Move blocker?',
+        message: `"${child?.text ?? 'This todo'}" is currently blocking "${oldParent.text}". Move it to block "${todo.text}" instead?`,
+        confirmLabel: 'Move',
+        danger: false,
+      })
+      if (!ok) return
+      await updateTodo({ ...oldParent, dependsOn: (oldParent.dependsOn ?? []).filter(d => d !== depId) })
     }
+
+    const current = new Set(todo.dependsOn ?? [])
+    current.add(depId)
     onDepsChange(todo, Array.from(current))
   }
 
@@ -362,7 +381,7 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
                 {activeDeps.map(dep => (
                   <Box key={dep.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.75, borderBottom: '1px solid #1f2937' }}>
                     <Typography variant="body2" sx={{ flex: 1, fontSize: 12, color: 'error.light' }}>🔒 {dep.text}</Typography>
-                    <IconButton size="small" onClick={() => toggleDep(dep.id)} sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: 'error.main' } }}>
+                    <IconButton size="small" onClick={() => unlinkDep(dep.id)} sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: 'error.main' } }}>
                       <CloseIcon sx={{ fontSize: 14 }} />
                     </IconButton>
                   </Box>
@@ -389,7 +408,7 @@ export default function TodoDetailPanel({ todo, todos, onClose, onDepsChange, fo
                   Link existing todo
                 </Typography>
                 {linkableTodos.map(t => (
-                  <Box key={t.id} sx={{ display: 'flex', alignItems: 'center', py: 0.5, cursor: 'pointer' }} onClick={() => toggleDep(t.id)}>
+                  <Box key={t.id} sx={{ display: 'flex', alignItems: 'center', py: 0.5, cursor: 'pointer' }} onClick={() => linkDep(t.id)}>
                     <Checkbox size="small" checked={false} sx={{ p: 0.5 }} />
                     <Typography variant="body2" sx={{ fontSize: 12, ml: 0.5 }}>{t.text}</Typography>
                   </Box>
