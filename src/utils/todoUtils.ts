@@ -66,3 +66,87 @@ export function wouldCreateCycle(todos: Todo[], targetId: string, newDepId: stri
   }
   return false
 }
+
+export interface TodoSpace {
+  id: string          // stable-ish id: a root todo id, or 'unsorted'
+  name: string         // display name, derived from the tree's top node(s)
+  todoIds: Set<string> // member todo ids (subset of the input array)
+}
+
+/**
+ * Groups todos into independent connected "spaces" (trees) based on
+ * dependsOn edges, treated as undirected. Todos with no connections at all
+ * are bucketed into a single 'unsorted' space instead of getting their own.
+ * Each real tree is named after its root(s) — the member(s) with no other
+ * member depending on them within that component.
+ */
+export function computeSpaces(todos: Todo[]): TodoSpace[] {
+  const byId = indexTodos(todos)
+
+  // Union-Find over dependsOn edges (undirected)
+  const parent = new Map<string, string>()
+  for (const t of todos) parent.set(t.id, t.id)
+
+  function find(x: string): string {
+    let root = x
+    while (parent.get(root) !== root) root = parent.get(root)!
+    while (parent.get(x) !== root) {
+      const next = parent.get(x)!
+      parent.set(x, root)
+      x = next
+    }
+    return root
+  }
+  function union(a: string, b: string) {
+    const ra = find(a)
+    const rb = find(b)
+    if (ra !== rb) parent.set(ra, rb)
+  }
+
+  for (const t of todos) {
+    for (const depId of t.dependsOn ?? []) {
+      if (byId.has(depId)) union(t.id, depId)
+    }
+  }
+
+  const groups = new Map<string, string[]>()
+  for (const t of todos) {
+    const root = find(t.id)
+    const arr = groups.get(root)
+    if (arr) arr.push(t.id)
+    else groups.set(root, [t.id])
+  }
+
+  const spaces: TodoSpace[] = []
+  const unsorted: string[] = []
+
+  for (const memberIds of groups.values()) {
+    if (memberIds.length === 1) {
+      unsorted.push(memberIds[0])
+      continue
+    }
+    const memberSet = new Set(memberIds)
+    // Roots of this component: members nobody else in the component depends on
+    const tops = memberIds.filter(id =>
+      !memberIds.some(otherId => otherId !== id && (byId.get(otherId)?.dependsOn ?? []).includes(id))
+    )
+    let name: string
+    if (tops.length === 1) {
+      name = byId.get(tops[0])?.text ?? 'Untitled'
+    } else if (tops.length > 1) {
+      const names = tops.slice(0, 2).map(id => byId.get(id)?.text ?? '?')
+      name = tops.length > 2 ? `${names.join(', ')} +${tops.length - 2}` : names.join(' & ')
+    } else {
+      name = 'Untitled'
+    }
+    spaces.push({ id: tops[0] ?? memberIds[0], name, todoIds: memberSet })
+  }
+
+  spaces.sort((a, b) => b.todoIds.size - a.todoIds.size)
+
+  if (unsorted.length > 0) {
+    spaces.push({ id: 'unsorted', name: 'Unsorted', todoIds: new Set(unsorted) })
+  }
+
+  return spaces
+}

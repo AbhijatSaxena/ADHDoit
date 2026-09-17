@@ -19,8 +19,9 @@ import TodoGraph from '../components/TodoGraph'
 import TodoDetailPanel from '../components/TodoDetailPanel'
 import TodoAiChat from '../components/TodoAiChat'
 import MobileTodoList from '../components/MobileTodoList'
+import SpaceSwitcher from '../components/SpaceSwitcher'
 import { useTodoFocus } from '../hooks/useTodoFocus'
-import { getPendingBlockersByMap, indexTodos, findParentsOf } from '../utils/todoUtils'
+import { getPendingBlockersByMap, indexTodos, findParentsOf, computeSpaces } from '../utils/todoUtils'
 import { confirm } from '../components/ConfirmDialog'
 
 export default function TodosPage() {
@@ -33,6 +34,7 @@ export default function TodosPage() {
   const [newText, setNewText] = useState('')
   const [adding, setAdding] = useState(false)
   const [view, setView] = useState<'tree' | 'priority'>('tree')
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string>('all')
   const { focusedId, paused, accMs, focus, pause, resume, unfocus } = useTodoFocus()
 
   async function handleStop() {
@@ -101,6 +103,43 @@ export default function TodosPage() {
     () => new Map(priorityTodos.map(t => [t.id, getPendingBlockersByMap(t, byId).length])),
     [priorityTodos, byId],
   )
+
+  // Group the active graph into independent trees ("spaces") so unrelated
+  // hierarchies (Canada, USA, India, ...) don't visually collide.
+  const spaces = useMemo(() => computeSpaces(graphTodos), [graphTodos])
+  const spaceOptions = useMemo(() => [
+    { id: 'all', name: 'All', count: 0 },
+    ...spaces.map(s => ({ id: s.id, name: s.name, count: s.todoIds.size })),
+  ], [spaces])
+
+  // If the previously selected space disappeared (tree resolved/emptied), fall back to All
+  useEffect(() => {
+    if (selectedSpaceId === 'all') return
+    if (!spaces.some(s => s.id === selectedSpaceId)) setSelectedSpaceId('all')
+  }, [spaces, selectedSpaceId])
+
+  const activeSpace = spaces.find(s => s.id === selectedSpaceId)
+  const spaceGraphTodos = activeSpace ? graphTodos.filter(t => activeSpace.todoIds.has(t.id)) : graphTodos
+  const spaceReadyTodos = activeSpace ? readyTodos.filter(t => activeSpace.todoIds.has(t.id)) : readyTodos
+
+  function cycleSpace(dir: 1 | -1) {
+    const ids = spaceOptions.map(o => o.id)
+    const curIdx = ids.indexOf(selectedSpaceId)
+    const nextIdx = (curIdx + dir + ids.length) % ids.length
+    setSelectedSpaceId(ids[nextIdx])
+  }
+
+  // Ctrl+Alt+Left/Right cycles spaces (Alt+Left/Right alone is reserved by the
+  // browser for back/forward navigation, so we can't safely hook that).
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!e.ctrlKey || !e.altKey) return
+      if (e.key === 'ArrowLeft') { e.preventDefault(); cycleSpace(-1) }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); cycleSpace(1) }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [spaceOptions, selectedSpaceId])
 
   async function handleDepsChange(todo: Todo, deps: string[]) {
     const updated = { ...todo, dependsOn: deps }
@@ -214,6 +253,14 @@ export default function TodosPage() {
         />
       </Box>
 
+      <SpaceSwitcher
+        options={spaceOptions}
+        selectedId={selectedSpaceId}
+        onSelect={setSelectedSpaceId}
+        onPrev={() => cycleSpace(-1)}
+        onNext={() => cycleSpace(1)}
+      />
+
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mb: 1.5 }}>
         {priorityTodos.length > 0 && (
           <Button
@@ -262,14 +309,14 @@ export default function TodosPage() {
       {view === 'priority' ? (
         <Box>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1.5 }}>
-            ● Ready to work on ({readyTodos.length})
+            ● Ready to work on ({spaceReadyTodos.length})
           </Typography>
-          {readyTodos.length === 0 ? (
+          {spaceReadyTodos.length === 0 ? (
             <Typography sx={{ fontSize: 13, color: 'text.disabled', py: 2 }}>
               No ready todos — everything is blocked or done.
             </Typography>
           ) : (
-            readyTodos.map((todo, i) => (
+            spaceReadyTodos.map((todo, i) => (
               <Box
                 key={todo.id}
                 role="button"
@@ -296,7 +343,7 @@ export default function TodosPage() {
         </Box>
       ) : (
         <TodoGraph
-          todos={graphTodos}
+          todos={spaceGraphTodos}
           onSelect={handleSelect}
           onConnect={handleConnect}
           onDisconnect={handleDisconnect}
