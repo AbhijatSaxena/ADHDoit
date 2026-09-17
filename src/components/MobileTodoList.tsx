@@ -77,7 +77,7 @@ export default function MobileTodoList({ todos }: Props) {
     if (!text || !selectedFresh) return
     setAddingBlocker(true)
     const newTodo = await add(text)
-    const updated = { ...selectedFresh, dependsOn: [newTodo.id] }
+    const updated = { ...selectedFresh, dependsOn: [...new Set([...(selectedFresh.dependsOn ?? []), newTodo.id])] }
     await update(updated)
     setNewBlockerText('')
     setAddingBlocker(false)
