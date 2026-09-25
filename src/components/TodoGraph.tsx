@@ -439,8 +439,6 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
               const mid2y = y1 + (y2 - y1) * 0.6
               const d = `M ${x1} ${y1} C ${x1} ${mid1y}, ${x2} ${mid2y}, ${x2} ${y2}`
               const key = `${e.source}-${e.target}`
-              const mx = (x1 + x2) / 2
-              const my = (y1 + y2) / 2
               const isPendingDel = pendingDisconnect?.blockerId === e.source && pendingDisconnect?.blockedId === e.target
               const isHovered = hoveredEdge === key && !drag && !isPendingDel
               const strokeColor = isPendingDel ? '#ef4444' : isHovered ? '#f97316' : e.done ? '#16a34a' : '#7c3f3f'
@@ -473,44 +471,6 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
                     opacity={e.done && !isHovered && !isPendingDel ? 0.6 : 1}
                     style={{ pointerEvents: 'none', transition: 'stroke 0.1s' }}
                   />
-                  {/* Hover: X icon to initiate removal */}
-                  {isHovered && (
-                    <g
-                      transform={`translate(${mx}, ${my})`}
-                      onMouseEnter={() => setHoveredEdge(key)}
-                      onMouseLeave={() => setHoveredEdge(null)}
-                      onClick={e2 => {
-                        e2.stopPropagation()
-                        setPendingDisconnect({ blockerId: e.source, blockedId: e.target })
-                        setHoveredEdge(null)
-                      }}
-                      style={{ pointerEvents: 'all', cursor: 'pointer' }}
-                    >
-                      <circle r={11} fill="#1f2937" stroke="#f97316" strokeWidth={1.5} />
-                      <text textAnchor="middle" dominantBaseline="central" fill="#f97316" fontSize={14} fontWeight="bold" style={{ userSelect: 'none', pointerEvents: 'none' }}>×</text>
-                    </g>
-                  )}
-                  {/* Pending delete: ✓ / ✗ inline on the arrow */}
-                  {isPendingDel && (
-                    <g>
-                      <g
-                        transform={`translate(${mx - 16}, ${my})`}
-                        onClick={e2 => { e2.stopPropagation(); onDisconnect(e.source, e.target); setPendingDisconnect(null) }}
-                        style={{ pointerEvents: 'all', cursor: 'pointer' }}
-                      >
-                        <circle r={11} fill="#450a0a" stroke="#ef4444" strokeWidth={1.5} />
-                        <text textAnchor="middle" dominantBaseline="central" fill="#ef4444" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✓</text>
-                      </g>
-                      <g
-                        transform={`translate(${mx + 16}, ${my})`}
-                        onClick={e2 => { e2.stopPropagation(); setPendingDisconnect(null) }}
-                        style={{ pointerEvents: 'all', cursor: 'pointer' }}
-                      >
-                        <circle r={11} fill="#111827" stroke="#6b7280" strokeWidth={1.5} />
-                        <text textAnchor="middle" dominantBaseline="central" fill="#9ca3af" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✗</text>
-                      </g>
-                    </g>
-                  )}
                 </g>
               )
             })}
@@ -521,51 +481,6 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
               if (!n) return null
               const cx = n.x + NODE_W / 2
               return <path d={`M ${cx} ${n.y + NODE_H} L ${cx} ${n.y + NODE_H + 18}`} stroke="#22c55e55" strokeWidth={1.5} strokeDasharray="3,3" fill="none" style={{ pointerEvents: 'none' }} />
-            })()}
-
-            {/* Ghost wire while dragging */}
-            {drag && (() => {
-              const { fromX, fromY, curX, curY } = drag
-              const mid1y = fromY + (curY - fromY) * 0.4
-              const mid2y = fromY + (curY - fromY) * 0.6
-              const dPath = `M ${fromX} ${fromY} C ${fromX} ${mid1y}, ${curX} ${mid2y}, ${curX} ${curY}`
-              return (
-                <path d={dPath} stroke="#60a5fa" strokeWidth={2} fill="none" strokeDasharray="6,4" markerEnd="url(#arrow-blue)" style={{ pointerEvents: 'none' }} />
-              )
-            })()}
-
-            {/* Pending connect: preview arrow with inline ✓ / ✗ */}
-            {pendingConnect && (() => {
-              const src = nodes.find(n => n.todo.id === pendingConnect.blockerId)
-              const tgt = nodes.find(n => n.todo.id === pendingConnect.blockedId)
-              if (!src || !tgt) return null
-              const x1 = src.x + NODE_W / 2, y1 = src.y
-              const x2 = tgt.x + NODE_W / 2, y2 = tgt.y + NODE_H
-              const mid1y = y1 + (y2 - y1) * 0.4
-              const mid2y = y1 + (y2 - y1) * 0.6
-              const dPath = `M ${x1} ${y1} C ${x1} ${mid1y}, ${x2} ${mid2y}, ${x2} ${y2}`
-              const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
-              return (
-                <g>
-                  <path d={dPath} stroke="#60a5fa" strokeWidth={2} fill="none" strokeDasharray="6,4" markerEnd="url(#arrow-blue)" style={{ pointerEvents: 'none' }} />
-                  <g
-                    transform={`translate(${mx - 16}, ${my})`}
-                    onClick={e => { e.stopPropagation(); onConnect(pendingConnect.blockerId, pendingConnect.blockedId); setPendingConnect(null) }}
-                    style={{ pointerEvents: 'all', cursor: 'pointer' }}
-                  >
-                    <circle r={11} fill="#052e16" stroke="#22c55e" strokeWidth={1.5} />
-                    <text textAnchor="middle" dominantBaseline="central" fill="#22c55e" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✓</text>
-                  </g>
-                  <g
-                    transform={`translate(${mx + 16}, ${my})`}
-                    onClick={e => { e.stopPropagation(); setPendingConnect(null) }}
-                    style={{ pointerEvents: 'all', cursor: 'pointer' }}
-                  >
-                    <circle r={11} fill="#111827" stroke="#6b7280" strokeWidth={1.5} />
-                    <text textAnchor="middle" dominantBaseline="central" fill="#9ca3af" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✗</text>
-                  </g>
-                </g>
-              )
             })()}
           </svg>
 
@@ -648,6 +563,110 @@ export default function TodoGraph({ todos, onSelect, onConnect, onDisconnect, on
               />
             ))}
           </div>
+
+          {/* Overlay SVG — painted AFTER the node cards so hover/confirm
+              controls (delete X, move ✓/✗, ghost wire) are never hidden
+              behind a tile that happens to sit near an edge's midpoint. */}
+          <svg
+            style={{ position: 'absolute', top: 0, left: 0, width, height, overflow: 'visible', pointerEvents: 'none' }}
+          >
+            {edges.map(e => {
+              const { x1, y1, x2, y2 } = e.points
+              const key = `${e.source}-${e.target}`
+              const mx = (x1 + x2) / 2
+              const my = (y1 + y2) / 2
+              const isPendingDel = pendingDisconnect?.blockerId === e.source && pendingDisconnect?.blockedId === e.target
+              const isHovered = hoveredEdge === key && !drag && !isPendingDel
+              if (!isHovered && !isPendingDel) return null
+              return (
+                <g key={key}>
+                  {/* Hover: X icon to initiate removal */}
+                  {isHovered && (
+                    <g
+                      transform={`translate(${mx}, ${my})`}
+                      onMouseEnter={() => setHoveredEdge(key)}
+                      onMouseLeave={() => setHoveredEdge(null)}
+                      onClick={e2 => {
+                        e2.stopPropagation()
+                        setPendingDisconnect({ blockerId: e.source, blockedId: e.target })
+                        setHoveredEdge(null)
+                      }}
+                      style={{ pointerEvents: 'all', cursor: 'pointer' }}
+                    >
+                      <circle r={11} fill="#1f2937" stroke="#f97316" strokeWidth={1.5} />
+                      <text textAnchor="middle" dominantBaseline="central" fill="#f97316" fontSize={14} fontWeight="bold" style={{ userSelect: 'none', pointerEvents: 'none' }}>×</text>
+                    </g>
+                  )}
+                  {/* Pending delete: ✓ / ✗ inline on the arrow */}
+                  {isPendingDel && (
+                    <g>
+                      <g
+                        transform={`translate(${mx - 16}, ${my})`}
+                        onClick={e2 => { e2.stopPropagation(); onDisconnect(e.source, e.target); setPendingDisconnect(null) }}
+                        style={{ pointerEvents: 'all', cursor: 'pointer' }}
+                      >
+                        <circle r={11} fill="#450a0a" stroke="#ef4444" strokeWidth={1.5} />
+                        <text textAnchor="middle" dominantBaseline="central" fill="#ef4444" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✓</text>
+                      </g>
+                      <g
+                        transform={`translate(${mx + 16}, ${my})`}
+                        onClick={e2 => { e2.stopPropagation(); setPendingDisconnect(null) }}
+                        style={{ pointerEvents: 'all', cursor: 'pointer' }}
+                      >
+                        <circle r={11} fill="#111827" stroke="#6b7280" strokeWidth={1.5} />
+                        <text textAnchor="middle" dominantBaseline="central" fill="#9ca3af" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✗</text>
+                      </g>
+                    </g>
+                  )}
+                </g>
+              )
+            })}
+
+            {/* Ghost wire while dragging */}
+            {drag && (() => {
+              const { fromX, fromY, curX, curY } = drag
+              const mid1y = fromY + (curY - fromY) * 0.4
+              const mid2y = fromY + (curY - fromY) * 0.6
+              const dPath = `M ${fromX} ${fromY} C ${fromX} ${mid1y}, ${curX} ${mid2y}, ${curX} ${curY}`
+              return (
+                <path d={dPath} stroke="#60a5fa" strokeWidth={2} fill="none" strokeDasharray="6,4" markerEnd="url(#arrow-blue)" style={{ pointerEvents: 'none' }} />
+              )
+            })()}
+
+            {/* Pending connect: preview arrow with inline ✓ / ✗ */}
+            {pendingConnect && (() => {
+              const src = nodes.find(n => n.todo.id === pendingConnect.blockerId)
+              const tgt = nodes.find(n => n.todo.id === pendingConnect.blockedId)
+              if (!src || !tgt) return null
+              const x1 = src.x + NODE_W / 2, y1 = src.y
+              const x2 = tgt.x + NODE_W / 2, y2 = tgt.y + NODE_H
+              const mid1y = y1 + (y2 - y1) * 0.4
+              const mid2y = y1 + (y2 - y1) * 0.6
+              const dPath = `M ${x1} ${y1} C ${x1} ${mid1y}, ${x2} ${mid2y}, ${x2} ${y2}`
+              const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
+              return (
+                <g>
+                  <path d={dPath} stroke="#60a5fa" strokeWidth={2} fill="none" strokeDasharray="6,4" markerEnd="url(#arrow-blue)" style={{ pointerEvents: 'none' }} />
+                  <g
+                    transform={`translate(${mx - 16}, ${my})`}
+                    onClick={e => { e.stopPropagation(); onConnect(pendingConnect.blockerId, pendingConnect.blockedId); setPendingConnect(null) }}
+                    style={{ pointerEvents: 'all', cursor: 'pointer' }}
+                  >
+                    <circle r={11} fill="#052e16" stroke="#22c55e" strokeWidth={1.5} />
+                    <text textAnchor="middle" dominantBaseline="central" fill="#22c55e" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✓</text>
+                  </g>
+                  <g
+                    transform={`translate(${mx + 16}, ${my})`}
+                    onClick={e => { e.stopPropagation(); setPendingConnect(null) }}
+                    style={{ pointerEvents: 'all', cursor: 'pointer' }}
+                  >
+                    <circle r={11} fill="#111827" stroke="#6b7280" strokeWidth={1.5} />
+                    <text textAnchor="middle" dominantBaseline="central" fill="#9ca3af" fontSize={13} style={{ userSelect: 'none', pointerEvents: 'none' }}>✗</text>
+                  </g>
+                </g>
+              )
+            })()}
+          </svg>
 
         </div>
       </div>
