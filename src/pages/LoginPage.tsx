@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   Box, Paper, Typography, TextField, Button, Alert, CircularProgress,
 } from '@mui/material'
@@ -81,12 +81,6 @@ export default function LoginPage() {
           </Box>
         </form>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2.5, textAlign: 'center', fontSize: 12 }}>
-          Don't have an account?{' '}
-          <Link to="/signup" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 500 }}>
-            Sign up
-          </Link>
-        </Typography>
       </Paper>
     </Box>
   )
