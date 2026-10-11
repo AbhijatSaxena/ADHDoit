@@ -13,7 +13,8 @@ import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined'
 import {
-  fetchAllSessions, revokeSession, deleteRevokedSessions, fetchAllUsers, fetchTodos, fetchArchivedTodos,
+  fetchAllSessions, revokeSession, deleteRevokedSessions, deleteSession,
+  fetchAllUsers, fetchTodos, fetchArchivedTodos,
   saveTodo, deleteTodo, deleteUserAccount,
 } from '../services/firebase'
 import type { Session, UserRecord } from '../services/firebase'
@@ -47,6 +48,7 @@ function SessionsTab() {
   const [loading, setLoading] = useState(true)
   const [revoking, setRevoking] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
+  const [clearingInactive, setClearingInactive] = useState(false)
   const currentSessionId = useAuthStore(s => s.sessionId)
 
   const loadSessions = useCallback(async () => {
@@ -74,6 +76,28 @@ function SessionsTab() {
     }
   }
 
+  async function handleClearInactive() {
+    const inactive = sessions.filter(s =>
+      !s.revoked &&
+      s.id !== currentSessionId &&
+      !isActive(s.lastSeen as unknown as { seconds: number })
+    )
+    const ok = await confirm({
+      title: 'Clear inactive sessions',
+      message: `Permanently delete ${inactive.length} idle session${inactive.length !== 1 ? 's' : ''}?`,
+      confirmLabel: 'Clear',
+      danger: true,
+    })
+    if (!ok) return
+    setClearingInactive(true)
+    try {
+      await Promise.all(inactive.map(s => deleteSession(s.id)))
+      setSessions(prev => prev.filter(s => !inactive.some(i => i.id === s.id)))
+    } finally {
+      setClearingInactive(false)
+    }
+  }
+
   async function handleRevoke(session: Session) {
     if (session.id === currentSessionId) return
     setRevoking(session.id)
@@ -88,6 +112,19 @@ function SessionsTab() {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mb: 1.5 }}>
+        {sessions.some(s => !s.revoked && s.id !== currentSessionId && !isActive(s.lastSeen as unknown as { seconds: number })) && (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={handleClearInactive}
+            disabled={clearingInactive}
+            sx={{ fontSize: 11, textTransform: 'none', py: 0.25, px: 1.25, height: 26, color: 'text.secondary', borderColor: '#374151', '&:hover': { borderColor: '#6b7280', bgcolor: 'rgba(107,114,128,0.08)' } }}
+          >
+            {clearingInactive
+              ? <CircularProgress size={12} />
+              : `Clear inactive (${sessions.filter(s => !s.revoked && s.id !== currentSessionId && !isActive(s.lastSeen as unknown as { seconds: number })).length})`}
+          </Button>
+        )}
         {sessions.some(s => s.revoked) && (
           <Button
             size="small"

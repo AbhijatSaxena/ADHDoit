@@ -108,8 +108,8 @@ export default function TodosPage() {
   // hierarchies (Canada, USA, India, ...) don't visually collide.
   const spaces = useMemo(() => computeSpaces(graphTodos), [graphTodos])
   const spaceOptions = useMemo(() => [
-    { id: 'all', name: 'All', count: 0 },
     ...spaces.map(s => ({ id: s.id, name: s.name, count: s.todoIds.size })),
+    { id: 'all', name: 'All', count: 0 },
   ], [spaces])
 
   // If the previously selected space disappeared (tree resolved/emptied), fall back to All
