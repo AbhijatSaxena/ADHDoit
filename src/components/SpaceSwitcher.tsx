@@ -20,7 +20,7 @@ export default function SpaceSwitcher({ options, selectedId, onSelect, onPrev, o
   if (options.length <= 2) return null // just "All" + one real tree — nothing to switch between
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
+    <Box sx={{ display: 'flex', width: 'fit-content', maxWidth: '100%', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
       <Tooltip title="Previous space (Ctrl+Alt+←)" arrow>
         <IconButton
           size="small"
@@ -31,7 +31,7 @@ export default function SpaceSwitcher({ options, selectedId, onSelect, onPrev, o
         </IconButton>
       </Tooltip>
 
-      <Box sx={{ display: 'flex', gap: 0.5, overflowX: 'auto', flex: 1, py: 0.25, '&::-webkit-scrollbar': { height: 4 } }}>
+      <Box sx={{ display: 'flex', gap: 0.5, overflowX: 'auto', minWidth: 0, py: 0.25, '&::-webkit-scrollbar': { height: 4 } }}>
         {options.map(opt => {
           const active = opt.id === selectedId
           return (
