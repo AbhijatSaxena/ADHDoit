@@ -34,7 +34,7 @@ export default function TodosPage() {
   const [newText, setNewText] = useState('')
   const [adding, setAdding] = useState(false)
   const [view, setView] = useState<'tree' | 'priority'>('tree')
-  const [selectedSpaceId, setSelectedSpaceId] = useState<string>('all')
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string>('')
   const { focusedId, paused, accMs, focus, pause, resume, unfocus } = useTodoFocus()
 
   async function handleStop() {
@@ -112,10 +112,12 @@ export default function TodosPage() {
     { id: 'all', name: 'All', count: 0 },
   ], [spaces])
 
-  // If the previously selected space disappeared (tree resolved/emptied), fall back to All
+  // Auto-select the first space on initial load; if selected space disappears, fall back to first (or All)
   useEffect(() => {
     if (selectedSpaceId === 'all') return
-    if (!spaces.some(s => s.id === selectedSpaceId)) setSelectedSpaceId('all')
+    if (!selectedSpaceId || !spaces.some(s => s.id === selectedSpaceId)) {
+      setSelectedSpaceId(spaces.length > 0 ? spaces[0].id : 'all')
+    }
   }, [spaces, selectedSpaceId])
 
   const activeSpace = spaces.find(s => s.id === selectedSpaceId)
