@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Box, CircularProgress, Button, Dialog, DialogTitle, DialogContent,
   List, ListItem, ListItemText, IconButton, Typography, Tooltip,
@@ -35,6 +35,7 @@ export default function TodosPage() {
   const [adding, setAdding] = useState(false)
   const [view, setView] = useState<'tree' | 'priority'>('tree')
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>('')
+  const spaceInitialized = useRef(false)
   const { focusedId, paused, accMs, focus, pause, resume, unfocus } = useTodoFocus()
 
   async function handleStop() {
@@ -112,10 +113,16 @@ export default function TodosPage() {
     { id: 'all', name: 'All', count: 0 },
   ], [spaces])
 
-  // Auto-select the first space on initial load; if selected space disappears, fall back to first (or All)
+  // Auto-select the first space once spaces first become available; after that only handle disappearing spaces
   useEffect(() => {
-    if (selectedSpaceId === 'all') return
-    if (!selectedSpaceId || !spaces.some(s => s.id === selectedSpaceId)) {
+    if (spaces.length === 0) return
+    if (!spaceInitialized.current) {
+      spaceInitialized.current = true
+      setSelectedSpaceId(spaces[0].id)
+      return
+    }
+    // Selected space disappeared (e.g. all todos resolved) — fall back
+    if (selectedSpaceId !== 'all' && !spaces.some(s => s.id === selectedSpaceId)) {
       setSelectedSpaceId(spaces.length > 0 ? spaces[0].id : 'all')
     }
   }, [spaces, selectedSpaceId])
